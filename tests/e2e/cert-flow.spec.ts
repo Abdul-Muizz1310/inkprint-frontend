@@ -24,7 +24,9 @@ test.describe("fingerprint happy path", () => {
     await page.getByTestId("editor-fingerprint-button").click();
 
     // Step 3 — wait for navigation to /certificates/<uuid>.
-    await page.waitForURL(/\/certificates\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    // Backend cold-start on Render free can push the POST past 20s; give it
+    // room plus the RSC page load for the certificate page.
+    await page.waitForURL(/\/certificates\/[0-9a-f-]{36}$/, { timeout: 90_000 });
 
     // Step 4 — certificate page renders every payoff element.
     await expect(page.getByTestId("cert-headline")).toBeVisible();

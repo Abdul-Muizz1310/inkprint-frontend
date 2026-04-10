@@ -8,6 +8,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
+  // Backend on Render free can take ~20-30s for the first request of a session
+  // (cold pgvector connection, embedding model load). Give the cert-flow test
+  // enough headroom to make two sequential POSTs.
+  timeout: 120_000,
   reporter: "list",
   use: {
     baseURL,
