@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CertificateCard } from "@/components/certificate-card";
 import type { CertificateResponse } from "@/lib/schemas";
@@ -27,14 +26,18 @@ const defaultProps = {
     "https://inkprint-backend.onrender.com/certificates/550e8400-e29b-41d4-a716-446655440000/qr",
 };
 
+const clipboardWriteText = vi.fn<(text: string) => Promise<void>>(async () => {});
+
 describe("CertificateCard", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
     );
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn(async () => undefined) },
+    clipboardWriteText.mockClear();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
     });
   });
 
@@ -57,10 +60,15 @@ describe("CertificateCard", () => {
   });
 
   it("truncates the hash but copies the full value", async () => {
-    const user = userEvent.setup();
+    expect(navigator.clipboard.writeText).toBe(clipboardWriteText);
+
     render(<CertificateCard {...defaultProps} />);
-    await user.click(screen.getByTestId("cert-hash"));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(fullHash);
+    const hashEl = screen.getByTestId("cert-hash");
+    expect(hashEl.textContent).toContain("…");
+    fireEvent.click(hashEl);
+    // Allow the microtask that calls clipboard.writeText to flush.
+    await Promise.resolve();
+    expect(clipboardWriteText.mock.calls[0]?.[0]).toBe(fullHash);
   });
 
   it("formats issued-at with UTC", () => {
@@ -80,25 +88,37 @@ describe("CertificateCard", () => {
   });
 
   it("share button copies the full certificate URL", async () => {
-    const user = userEvent.setup();
     render(<CertificateCard {...defaultProps} />);
-    await user.click(screen.getByTestId("cert-share"));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(cert.id));
+    fireEvent.click(screen.getByTestId("cert-share"));
+    await Promise.resolve();
+
+    const calls = clipboardWriteText.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0]).toContain(cert.id);
   });
 
   it("download-manifest button fetches and triggers a download", async () => {
-    const fetchMock = vi.fn(
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
       async () => new Response(JSON.stringify({ manifest: "ok" }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const user = userEvent.setup();
-    render(<CertificateCard {...defaultProps} />);
-    await user.click(screen.getByTestId("cert-download-manifest"));
+    // jsdom doesn't implement URL.createObjectURL; stub it.
+    const createObjectURL = vi.fn(() => "blob:mock");
+    const revokeObjectURL = vi.fn();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining(`/certificates/${cert.id}/manifest`),
-    );
+    render(<CertificateCard {...defaultProps} />);
+    fireEvent.click(screen.getByTestId("cert-download-manifest"));
+    // Flush the async handler.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // fetch is called as fetch(url, init); assert on the first arg only.
+    const calls = fetchMock.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0]).toContain(`/certificates/${cert.id}/manifest`);
+    expect(createObjectURL).toHaveBeenCalled();
   });
 
   it("renders the QR image with fixed dimensions", () => {
