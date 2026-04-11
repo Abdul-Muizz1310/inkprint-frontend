@@ -4,103 +4,258 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────
+ * inkprint — ink-on-terminal aesthetic
+ * structure inspired by paper-trail; accent shifted to amber/violet
+ * to carry the "certificate of authorship" identity.
+ * ───────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --surface: #ffffff;
-  --surface-hover: #f5f5f4;
-  --card: #ffffff;
-  --card-foreground: #1c1917;
-  --popover: #ffffff;
-  --popover-foreground: #1c1917;
+  /* Surfaces */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --surface: #12121a;
+  --surface-hover: #1a1a25;
+  --card: #12121a;
+  --card-foreground: #fafafa;
+  --popover: #12121a;
+  --popover-foreground: #fafafa;
 
-  --fg-muted: #78716c;
-  --fg-faint: #a8a29e;
-  --muted: #f5f5f4;
-  --muted-foreground: #78716c;
+  /* Text scale */
+  --fg-muted: #8a8aa3;
+  --fg-faint: #4a4a63;
+  --muted: #12121a;
+  --muted-foreground: #8a8aa3;
 
-  --border: #e7e5e4;
-  --border-bright: #d6d3d1;
-  --input: #e7e5e4;
+  /* Borders */
+  --border: #1e1e2e;
+  --border-bright: #2a2a3d;
+  --input: #1e1e2e;
 
-  --accent-ink: #1e3a5f;
-  --accent-ink-soft: rgba(30, 58, 95, 0.08);
-  --accent-gold: #b8860b;
-  --accent: #f5f5f4;
-  --accent-foreground: #1e3a5f;
-  --primary: #1e3a5f;
-  --primary-foreground: #fafaf9;
-  --secondary: #f5f5f4;
-  --secondary-foreground: #1c1917;
-  --ring: #1e3a5f;
+  /* Accents — amber ink is the signature, violet is the seal */
+  --accent-ink: #e0b55e;
+  --accent-ink-soft: rgba(224, 181, 94, 0.1);
+  --accent-violet: #8b6fbf;
+  --accent-rose: #d07a7a;
+  --accent: #1a1a25;
+  --accent-foreground: #e0b55e;
+  --primary: #e0b55e;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a25;
+  --secondary-foreground: #fafafa;
+  --ring: #e0b55e;
 
-  --success: #16a34a;
-  --warning: #d97706;
-  --error: #dc2626;
-
-  --destructive: #dc2626;
-  --destructive-foreground: #fafaf9;
-
-  --radius: 0.5rem;
-
-  --sidebar-background: #fafaf9;
-  --sidebar-foreground: #1c1917;
-  --sidebar-primary: #1e3a5f;
-  --sidebar-primary-foreground: #fafaf9;
-  --sidebar-accent: #f5f5f4;
-  --sidebar-accent-foreground: #1c1917;
-  --sidebar-border: #e7e5e4;
-  --sidebar-ring: #1e3a5f;
-}
-
-.dark {
-  --background: #0c0a09;
-  --foreground: #fafaf9;
-  --surface: #1c1917;
-  --surface-hover: #292524;
-  --card: #1c1917;
-  --card-foreground: #fafaf9;
-  --popover: #1c1917;
-  --popover-foreground: #fafaf9;
-
-  --fg-muted: #a8a29e;
-  --fg-faint: #78716c;
-  --muted: #1c1917;
-  --muted-foreground: #a8a29e;
-
-  --border: #292524;
-  --border-bright: #44403c;
-  --input: #292524;
-
-  --accent-ink: #93c5fd;
-  --accent-ink-soft: rgba(147, 197, 253, 0.1);
-  --accent-gold: #fbbf24;
-  --accent: #292524;
-  --accent-foreground: #93c5fd;
-  --primary: #93c5fd;
-  --primary-foreground: #0c0a09;
-  --secondary: #292524;
-  --secondary-foreground: #fafaf9;
-  --ring: #93c5fd;
-
-  --success: #22c55e;
+  /* Semantic */
+  --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
-
   --destructive: #ef4444;
-  --destructive-foreground: #fafaf9;
+  --destructive-foreground: #fafafa;
 
-  --sidebar-background: #0c0a09;
-  --sidebar-foreground: #fafaf9;
-  --sidebar-primary: #93c5fd;
-  --sidebar-primary-foreground: #0c0a09;
-  --sidebar-accent: #292524;
-  --sidebar-accent-foreground: #fafaf9;
-  --sidebar-border: #292524;
-  --sidebar-ring: #93c5fd;
+  /* Shadows / glow */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 8px 30px rgb(0 0 0 / 0.6);
+  --glow-sm: 0 0 20px rgb(224 181 94 / 0.15);
+  --glow-md: 0 0 40px rgb(224 181 94 / 0.2);
+  --glow-lg: 0 0 80px rgb(224 181 94 / 0.15);
+
+  /* macOS traffic lights */
+  --mac-red: #ff5f56;
+  --mac-yellow: #ffbd2e;
+  --mac-green: #27c93f;
+
+  /* Radii */
+  --radius: 0.625rem;
+
+  /* Chart (kept for shadcn compat) */
+  --chart-1: #e0b55e;
+  --chart-2: #8b6fbf;
+  --chart-3: #d07a7a;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+
+  /* Sidebar (kept for shadcn compat) */
+  --sidebar: #12121a;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #e0b55e;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a25;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #1e1e2e;
+  --sidebar-ring: #e0b55e;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-bright: var(--border-bright);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-ink-soft: var(--accent-ink-soft);
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-rose: var(--accent-rose);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-ring: var(--ring);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-mac-red: var(--mac-red);
+  --color-mac-yellow: var(--mac-yellow);
+  --color-mac-green: var(--mac-green);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-eb-garamond), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  }
+  html {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--accent-ink-soft);
+    color: var(--accent-ink);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Background grid + amber/violet glow — atmospheric layer
+ * ───────────────────────────────────────────────────────────── */
+
+.bg-grid {
+  background-image:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(224, 181, 94, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      rgba(139, 111, 191, 0.05) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 1px 1px,
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 0
+    );
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+  background-attachment: fixed, fixed, fixed;
+}
+
+.bg-scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 2px,
+    rgba(255, 255, 255, 0.015) 2px,
+    rgba(255, 255, 255, 0.015) 3px
+  );
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Terminal window chrome (used by <TerminalWindow>)
+ * ───────────────────────────────────────────────────────────── */
+
+.terminal-glow {
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--shadow-lg),
+    var(--glow-sm);
+}
+
+.terminal-glow-strong {
+  box-shadow:
+    0 0 0 1px var(--border-bright),
+    var(--shadow-lg),
+    var(--glow-md);
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Blinking cursor for terminal prompts
+ * ───────────────────────────────────────────────────────────── */
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Pulsing dot (live indicators)
+ * ───────────────────────────────────────────────────────────── */
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(224 181 94 / 0.6); }
+  70% { box-shadow: 0 0 0 8px rgb(224 181 94 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(224 181 94 / 0); }
+}
+.pulse-ring {
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * The serif gravitational center — used on the Certificate page.
+ * One element in the whole app gets this: the payoff headline.
+ * ───────────────────────────────────────────────────────────── */
+
+.font-serif-display {
+  font-family: var(--font-serif);
+  font-feature-settings: "lnum" 1, "kern" 1, "liga" 1;
+  letter-spacing: -0.01em;
 }

@@ -18,7 +18,7 @@ type CertificateCardProps = {
 
 function readKeyId(manifest: Record<string, unknown>): string | null {
   // The backend's C2PA manifest stores the key id under `signature.key_id`;
-  // we also check `signer.key_id` for compatibility with older payloads.
+  // also check `signer.key_id` for compatibility with older payloads.
   for (const parent of ["signature", "signer"] as const) {
     const node = manifest[parent];
     if (node && typeof node === "object") {
@@ -33,8 +33,8 @@ async function copyToClipboard(text: string) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // Clipboard can be denied by the browser; silent failure is fine —
-    // the user can still select the text manually.
+    // Clipboard can be denied; silent failure is fine — the text is
+    // still selectable in the DOM.
   }
 }
 
@@ -70,21 +70,27 @@ export function CertificateCard({ cert, digestPreview, verifyUrl, qrUrl }: Certi
   }, [cert.id]);
 
   return (
-    <article className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-[var(--border-bright)] bg-[var(--surface)] p-10 shadow-xl">
-      {/* Watermark */}
+    <article className="relative overflow-hidden rounded-xl border border-border-bright bg-gradient-to-br from-surface to-background p-8 shadow-[0_0_60px_rgb(224_181_94_/_0.08)] md:p-12">
+      {/* Watermark — serif inkprint mark */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.04]"
       >
-        <svg viewBox="0 0 200 200" className="h-[320px] w-[320px]" role="presentation">
+        <svg
+          viewBox="0 0 200 200"
+          className="h-[420px] w-[420px] text-accent-ink"
+          role="presentation"
+        >
           <title>inkprint watermark</title>
-          <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" strokeWidth="4" />
+          <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="100" cy="100" r="82" fill="none" stroke="currentColor" strokeWidth="1" />
           <text
             x="100"
-            y="115"
+            y="110"
             textAnchor="middle"
-            fontSize="32"
-            fontFamily="serif"
+            fontSize="28"
+            fontFamily="var(--font-serif)"
+            fontStyle="italic"
             fill="currentColor"
           >
             inkprint
@@ -93,99 +99,125 @@ export function CertificateCard({ cert, digestPreview, verifyUrl, qrUrl }: Certi
       </div>
 
       <div className="relative">
+        {/* Header row: serif headline + QR */}
         <div className="flex items-start justify-between gap-6">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--fg-muted)]">
-              inkprint
-            </p>
+            <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-fg-faint">
+              <span className="text-accent-ink">{"//"}</span>
+              <span>c2pa v2.2 · ed25519</span>
+            </div>
             <h1
               data-testid="cert-headline"
-              className={cn(
-                "mt-2 font-serif text-3xl font-bold tracking-tight text-[var(--accent-ink)]",
-                "md:text-4xl",
-              )}
-              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+              className="font-serif-display text-3xl font-bold leading-tight text-accent-ink md:text-[2.75rem]"
             >
               Certificate of Authorship
             </h1>
+            <p className="mt-2 font-mono text-xs text-fg-muted">
+              issued <span className="text-accent-ink">{formatIssuedAt(cert.issued_at)}</span>
+            </p>
           </div>
-          <div data-testid="cert-qr">
-            <QRDisplay value={verifyUrl} src={qrUrl} size={120} alt="Verification QR" />
+
+          <div
+            data-testid="cert-qr"
+            className="shrink-0 rounded-lg border border-border bg-background/60 p-2"
+          >
+            <QRDisplay value={verifyUrl} src={qrUrl} size={112} alt="Verification QR" />
           </div>
         </div>
 
-        <dl className="mt-10 grid grid-cols-[auto_1fr] gap-x-6 gap-y-4 text-sm">
-          <dt className="font-medium text-[var(--fg-muted)]">Author</dt>
-          <dd data-testid="cert-author" className="text-[var(--foreground)]">
-            {cert.author}
-          </dd>
+        {/* Dashed separator */}
+        <div className="my-8 border-t border-dashed border-border-bright" />
 
-          <dt className="font-medium text-[var(--fg-muted)]">Hash</dt>
-          <dd className="font-mono text-[var(--foreground)]">
+        {/* Metadata grid */}
+        <dl className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <MetadataRow label="author" testid="cert-author">
+            <span className="text-foreground">{cert.author}</span>
+          </MetadataRow>
+
+          <MetadataRow label="issued_at" testid="cert-issued-at">
+            <span className="text-foreground">{formatIssuedAt(cert.issued_at)}</span>
+          </MetadataRow>
+
+          <MetadataRow label="content_hash">
             <button
               type="button"
               data-testid="cert-hash"
               onClick={handleCopyHash}
-              className="cursor-pointer bg-transparent p-0 font-mono text-inherit hover:text-[var(--accent-ink)]"
-              title="Click to copy full hash"
+              title="click to copy full hash"
+              className="cursor-pointer bg-transparent p-0 font-mono text-sm text-foreground transition-colors hover:text-accent-ink"
             >
-              {truncateMiddle(cert.content_hash, 6, 4)}
+              {truncateMiddle(cert.content_hash, 8, 6)}
+              <Copy className="ml-2 inline-block h-3 w-3 text-fg-faint" />
             </button>
-          </dd>
+          </MetadataRow>
 
-          <dt className="font-medium text-[var(--fg-muted)]">Issued at</dt>
-          <dd data-testid="cert-issued-at" className="text-[var(--foreground)]">
-            {formatIssuedAt(cert.issued_at)}
-          </dd>
-
-          <dt className="font-medium text-[var(--fg-muted)]">Key ID</dt>
-          <dd data-testid="cert-key-id" className="font-mono text-[var(--foreground)]">
-            {keyId}
-          </dd>
+          <MetadataRow label="key_id" testid="cert-key-id">
+            <span className="text-foreground">{keyId}</span>
+          </MetadataRow>
         </dl>
 
+        {/* Digest preview */}
         <div className="mt-8">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-muted)]">
-            Content digest (first 200 chars)
-          </p>
-          <pre className="max-h-32 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] p-4 text-xs text-[var(--foreground)]">
+          <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-faint">
+            <span className="text-accent-ink">{"//"}</span>
+            <span>content digest · first 200 chars</span>
+          </div>
+          <pre className="max-h-40 overflow-y-auto rounded-lg border border-border bg-background/60 p-4 font-mono text-[11px] leading-relaxed text-foreground">
             {digestPreview}
           </pre>
         </div>
 
-        <p data-testid="cert-verify-footer" className="mt-8 text-xs text-[var(--fg-muted)]">
-          Verify at {verifyUrl}
+        {/* Verify footer */}
+        <p data-testid="cert-verify-footer" className="mt-6 font-mono text-[11px] text-fg-muted">
+          <span className="text-fg-faint">verify at </span>
+          <span className="text-accent-ink">{verifyUrl}</span>
         </p>
 
-        <div className="mt-6 flex gap-3">
+        {/* Actions */}
+        <div className="mt-8 flex flex-wrap items-center gap-3">
           <button
             type="button"
             data-testid="cert-download-manifest"
             onClick={handleDownloadManifest}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-bright)] bg-[var(--background)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-hover)]"
+            className="inline-flex items-center gap-2 rounded-lg border border-border-bright bg-background/60 px-4 py-2 font-mono text-xs font-medium text-foreground transition hover:border-accent-ink/60 hover:bg-surface-hover"
           >
-            <Download className="h-4 w-4" />
-            Download manifest
+            <Download className="h-3.5 w-3.5 text-accent-ink" />
+            <span>download.manifest</span>
           </button>
           <button
             type="button"
             data-testid="cert-share"
             onClick={handleShare}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-ink)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] transition hover:opacity-90"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-full px-4 py-2 font-mono text-xs font-semibold",
+              "bg-gradient-to-r from-accent-ink to-accent-violet text-background",
+              "shadow-[0_0_20px_rgb(224_181_94_/_0.2)] transition-all hover:shadow-[0_0_30px_rgb(224_181_94_/_0.4)]",
+            )}
           >
-            <Share2 className="h-4 w-4" />
-            Share
-          </button>
-          <button
-            type="button"
-            onClick={handleCopyHash}
-            aria-label="Copy hash"
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--fg-muted)] transition hover:text-[var(--foreground)]"
-          >
-            <Copy className="h-4 w-4" />
+            <Share2 className="h-3.5 w-3.5" />
+            <span>share.link</span>
           </button>
         </div>
       </div>
     </article>
+  );
+}
+
+function MetadataRow({
+  label,
+  testid,
+  children,
+}: {
+  label: string;
+  testid?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="font-mono text-[10px] uppercase tracking-[0.15em] text-fg-faint">{label}</dt>
+      <dd data-testid={testid} className="font-mono text-sm">
+        {children}
+      </dd>
+    </div>
   );
 }

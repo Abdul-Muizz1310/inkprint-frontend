@@ -2,6 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { DiffView } from "@/components/diff-view";
+import { PageFrame } from "@/components/terminal/PageFrame";
+import { Prompt } from "@/components/terminal/Prompt";
+import { TerminalWindow } from "@/components/terminal/TerminalWindow";
 import { ApiError, diffText, getCertificateDownload } from "@/lib/api";
 import type { DiffResponse } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -38,10 +41,10 @@ export default function ComparePage() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
-          err.status === 404 ? "Parent certificate not found" : `Request failed (${err.status})`,
+          err.status === 404 ? "parent certificate not found" : `request failed (${err.status})`,
         );
       } else {
-        setError("Unexpected error. Please try again.");
+        setError("unexpected error. please try again.");
       }
     } finally {
       setLoading(false);
@@ -49,91 +52,113 @@ export default function ComparePage() {
   }, [newText, parentId]);
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
-      <h1
-        className="font-serif text-4xl font-bold tracking-tight text-[var(--accent-ink)]"
-        style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-      >
-        Compare to a certificate
-      </h1>
-      <p className="mt-3 text-[var(--fg-muted)]">
-        Supply a parent certificate id and the new text. We fetch the original from inkprint and
-        produce a derivative-work verdict.
-      </p>
-
-      <div className="mt-8 space-y-6">
-        <div>
-          <label
-            htmlFor="compare-parent-id"
-            className="mb-2 block text-xs font-medium uppercase tracking-wide text-[var(--fg-muted)]"
-          >
-            Parent certificate id
-          </label>
-          <input
-            id="compare-parent-id"
-            type="text"
-            value={parentId}
-            onChange={(e) => setParentId(e.target.value)}
-            placeholder="550e8400-e29b-41d4-a716-446655440000"
-            className="block w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 font-mono text-sm text-[var(--foreground)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          />
-          {parentId.length > 0 && !validParent ? (
-            <p className="mt-1 text-xs text-[var(--error)]">Must be a UUID.</p>
-          ) : null}
+    <PageFrame
+      active="compare"
+      statusLeft="inkprint.dev ~/compare"
+      statusRight={
+        <>
+          <span>
+            algo <span className="text-accent-ink">simhash + cosine</span>
+          </span>
+        </>
+      }
+    >
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-col gap-1.5">
+          <Prompt kind="comment">derivative-work detection</Prompt>
+          <Prompt kind="input">
+            inkprint diff --parent {"<uuid>"} --text {"<file>"}
+          </Prompt>
         </div>
 
-        <div>
-          <label
-            htmlFor="compare-new-text"
-            className="mb-2 block text-xs font-medium uppercase tracking-wide text-[var(--fg-muted)]"
-          >
-            New text
-          </label>
-          <textarea
-            id="compare-new-text"
-            value={newText}
-            onChange={(e) => setNewText(e.target.value)}
-            rows={10}
-            className="block w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 font-mono text-sm text-[var(--foreground)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          />
-        </div>
+        <TerminalWindow title="diff.request" statusDot="ink" statusLabel="ready">
+          <div className="flex flex-col gap-5">
+            <div>
+              <label
+                htmlFor="compare-parent-id"
+                className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-fg-faint"
+              >
+                parent_id
+              </label>
+              <input
+                id="compare-parent-id"
+                type="text"
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                placeholder="550e8400-e29b-41d4-a716-446655440000"
+                className="block w-full rounded-lg border border-border bg-background/60 px-3 py-2 font-mono text-xs text-foreground caret-accent-ink placeholder:text-fg-faint focus:border-accent-ink/60 focus:outline-none"
+              />
+              {parentId.length > 0 && !validParent ? (
+                <p className="mt-1 font-mono text-[11px] text-error">⨯ must be a uuid</p>
+              ) : null}
+            </div>
 
-        <button
-          type="button"
-          onClick={onCompare}
-          disabled={!canSubmit}
-          className={cn(
-            "inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition",
-            canSubmit
-              ? "bg-[var(--accent-ink)] text-[var(--primary-foreground)] hover:opacity-90"
-              : "cursor-not-allowed bg-[var(--muted)] text-[var(--fg-muted)]",
-          )}
-        >
-          {loading ? "Comparing…" : "Compare"}
-        </button>
+            <div>
+              <label
+                htmlFor="compare-new-text"
+                className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-fg-faint"
+              >
+                new.txt
+              </label>
+              <textarea
+                id="compare-new-text"
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
+                rows={10}
+                placeholder="paste the text you want to compare against the parent"
+                className="block w-full rounded-lg border border-border bg-background/60 p-4 font-mono text-[11px] leading-relaxed text-foreground caret-accent-ink placeholder:text-fg-faint focus:border-accent-ink/60 focus:outline-none"
+              />
+            </div>
 
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-[var(--error)] bg-[var(--background)] p-4 text-sm text-[var(--error)]"
-          >
-            {error}
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-[11px] text-fg-faint">
+                verdict: identical · near-duplicate · derivative · inspired · unrelated
+              </div>
+              <button
+                type="button"
+                onClick={onCompare}
+                disabled={!canSubmit}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-5 py-2 font-mono text-sm font-semibold transition-all",
+                  canSubmit
+                    ? "bg-gradient-to-r from-accent-ink to-accent-violet text-background shadow-[0_0_30px_rgb(224_181_94_/_0.25)] hover:shadow-[0_0_40px_rgb(224_181_94_/_0.45)]"
+                    : "cursor-not-allowed bg-surface text-fg-faint",
+                )}
+              >
+                <span className="text-background/70">$</span>
+                <span>{loading ? "comparing…" : "compare"}</span>
+              </button>
+            </div>
+
+            {error ? (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-lg border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs text-error"
+              >
+                <span>⨯</span>
+                <span>{error}</span>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </TerminalWindow>
 
         {state ? (
-          <DiffView
-            original={state.original}
-            current={state.current}
-            stats={{
-              overlap_pct: state.diff.overlap_pct,
-              hamming: state.diff.hamming,
-              cosine: state.diff.cosine,
-            }}
-            verdict={state.diff.verdict}
-          />
+          <div className="mt-6">
+            <TerminalWindow title="diff.result" statusDot="ink" statusLabel={state.diff.verdict}>
+              <DiffView
+                original={state.original}
+                current={state.current}
+                stats={{
+                  overlap_pct: state.diff.overlap_pct,
+                  hamming: state.diff.hamming,
+                  cosine: state.diff.cosine,
+                }}
+                verdict={state.diff.verdict}
+              />
+            </TerminalWindow>
+          </div>
         ) : null}
       </div>
-    </main>
+    </PageFrame>
   );
 }

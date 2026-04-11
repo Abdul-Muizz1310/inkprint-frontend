@@ -12,23 +12,49 @@ type LeakTerminalProps = {
 
 type Status = "pending" | "running" | "done" | "failed";
 
-function eventLine(event: LeakEvent): string {
+function eventLine(event: LeakEvent): {
+  marker: string;
+  text: string;
+  tone: "faint" | "ink" | "success" | "error";
+} {
   switch (event.type) {
     case "started":
-      return "▶ scan started";
+      return { marker: "▶", text: "scan started", tone: "faint" };
     case "scanning":
-      return `⋯ scanning ${event.corpus}${event.snapshot ? ` (${event.snapshot})` : ""}`;
+      return {
+        marker: "⋯",
+        text: `scanning ${event.corpus}${event.snapshot ? ` (${event.snapshot})` : ""}`,
+        tone: "ink",
+      };
     case "hit":
-      return `✴ hit in ${event.corpus}: ${event.url} (score ${event.score.toFixed(2)})`;
+      return {
+        marker: "✴",
+        text: `hit in ${event.corpus}: ${event.url} (score ${event.score.toFixed(2)})`,
+        tone: "ink",
+      };
     case "done":
-      return "✓ scan complete";
+      return { marker: "✓", text: "scan complete", tone: "success" };
     case "failed":
-      return `✗ scan failed: ${event.reason}`;
+      return { marker: "✗", text: `scan failed: ${event.reason}`, tone: "error" };
   }
 }
 
+const TONE_CLASS: Record<"faint" | "ink" | "success" | "error", string> = {
+  faint: "text-fg-muted",
+  ink: "text-accent-ink",
+  success: "text-success",
+  error: "text-error",
+};
+
+const STATUS_CLASS: Record<Status, string> = {
+  pending: "border-border-bright bg-surface text-fg-muted",
+  running: "border-accent-ink/40 bg-accent-ink/10 text-accent-ink",
+  done: "border-success/40 bg-success/10 text-success",
+  failed: "border-error/40 bg-error/10 text-error",
+};
+
 export function LeakTerminal({ scanId }: LeakTerminalProps) {
-  const [lines, setLines] = useState<string[]>([]);
+  const [lines, setLines] = useState<ReturnType<typeof eventLine>[]>([]);
   const [status, setStatus] = useState<Status>("pending");
   const [finalResult, setFinalResult] = useState<LeakScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +74,9 @@ export function LeakTerminal({ scanId }: LeakTerminalProps) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          setError("Scan not found");
+          setError("scan not found");
         } else {
-          setError("Failed to load scan");
+          setError("failed to load scan");
         }
       }
     }
@@ -82,30 +108,46 @@ export function LeakTerminal({ scanId }: LeakTerminalProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-mono text-sm text-[var(--fg-muted)]">Leak scan {scanId}</h2>
+        <div className="flex items-center gap-3 font-mono text-xs">
+          <span className="text-fg-faint">scan_id</span>
+          <span className="text-foreground">{scanId}</span>
+        </div>
         <span
           className={cn(
-            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide",
-            status === "pending" && "border-stone-200 bg-stone-100 text-stone-800",
-            status === "running" && "border-sky-200 bg-sky-100 text-sky-800",
-            status === "done" && "border-emerald-200 bg-emerald-100 text-emerald-800",
-            status === "failed" && "border-rose-200 bg-rose-100 text-rose-800",
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em]",
+            STATUS_CLASS[status],
           )}
         >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full bg-current",
+              status === "running" && "pulse-ring",
+            )}
+          />
           {status}
         </span>
       </div>
 
       <pre
         data-testid="leak-terminal"
-        className="min-h-[240px] overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--background)] p-4 font-mono text-xs text-[var(--foreground)]"
+        className="min-h-[280px] overflow-x-auto rounded-lg border border-border bg-background p-4 font-mono text-[11px] leading-relaxed"
       >
+        <div className="mb-2 flex items-center gap-2 text-fg-faint">
+          <span className="text-accent-ink">$</span>
+          <span>inkprint leak-scan --stream</span>
+        </div>
         {lines.length === 0 ? (
-          <span className="text-[var(--fg-muted)]">waiting for events…</span>
+          <span className="text-fg-faint">
+            waiting for events
+            <span className="ml-0.5 inline-block h-3 w-1.5 bg-accent-ink cursor-blink align-middle" />
+          </span>
         ) : (
           lines.map((line, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: append-only log list
-            <div key={i}>{line}</div>
+            <div key={i} className="flex items-start gap-2">
+              <span className={cn("shrink-0", TONE_CLASS[line.tone])}>{line.marker}</span>
+              <span className={cn("min-w-0", TONE_CLASS[line.tone])}>{line.text}</span>
+            </div>
           ))
         )}
       </pre>
@@ -113,22 +155,26 @@ export function LeakTerminal({ scanId }: LeakTerminalProps) {
       {error ? (
         <div
           role="alert"
-          className="rounded-lg border border-[var(--error)] bg-[var(--background)] p-4 text-sm text-[var(--error)]"
+          className="flex items-center gap-2 rounded-lg border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs text-error"
         >
-          {error}
+          <span>⨯</span>
+          <span>{error}</span>
         </div>
       ) : null}
 
       {finalResult && Array.isArray(finalResult.hits) && finalResult.hits.length > 0 ? (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">Hits</h3>
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-faint">
+            <span className="text-accent-ink">{"//"}</span>
+            <span>hits · {finalResult.hits.length}</span>
+          </div>
           {finalResult.hits.map((hit, i) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: server-ordered hit list
               key={i}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm"
+              className="rounded-lg border border-border bg-surface/50 p-4 font-mono text-[11px]"
             >
-              <pre className="whitespace-pre-wrap text-xs text-[var(--fg-muted)]">
+              <pre className="whitespace-pre-wrap text-fg-muted">
                 {JSON.stringify(hit, null, 2)}
               </pre>
             </div>

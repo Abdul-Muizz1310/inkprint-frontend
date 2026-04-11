@@ -1,13 +1,30 @@
+import Link from "next/link";
+import { PageFrame } from "@/components/terminal/PageFrame";
+import { TerminalWindow } from "@/components/terminal/TerminalWindow";
+
 export default function NotFound() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-24 text-center">
-      <h1 className="font-serif text-3xl font-bold text-[var(--accent-ink)]">
-        Certificate not found
-      </h1>
-      <p className="mt-4 text-[var(--fg-muted)]">We couldn't find a certificate with that id.</p>
-      <a href="/" className="mt-8 inline-block text-sm text-[var(--accent-ink)] hover:underline">
-        ← Back to editor
-      </a>
-    </main>
+    <PageFrame statusLeft="inkprint.dev ~/certificates/404">
+      <div className="mx-auto max-w-2xl pt-16">
+        <TerminalWindow title="error.log" statusDot="red" statusLabel="404">
+          <div className="space-y-4 font-mono text-sm">
+            <div className="flex items-center gap-2 text-fg-faint">
+              <span className="text-error">$</span>
+              <span>inkprint certificate show ./unknown</span>
+            </div>
+            <div className="text-error">⨯ certificate not found</div>
+            <p className="text-fg-muted">
+              we couldn&apos;t find a certificate with that id. it may have been deleted, or the id
+              may be a typo.
+            </p>
+            <div className="pt-2">
+              <Link href="/" className="text-accent-ink hover:underline">
+                ← back to editor
+              </Link>
+            </div>
+          </div>
+        </TerminalWindow>
+      </div>
+    </PageFrame>
   );
 }
