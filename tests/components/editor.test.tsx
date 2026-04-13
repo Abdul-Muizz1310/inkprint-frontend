@@ -140,9 +140,7 @@ describe("Editor", () => {
 
   it("extracts msg from array detail where first element has no msg", async () => {
     const { ApiError } = await import("@/lib/api");
-    createCertificateMock.mockRejectedValueOnce(
-      new ApiError(422, { detail: [{ loc: ["body"] }] }),
-    );
+    createCertificateMock.mockRejectedValueOnce(new ApiError(422, { detail: [{ loc: ["body"] }] }));
 
     const user = userEvent.setup();
     render(<Editor />);

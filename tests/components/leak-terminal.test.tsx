@@ -97,7 +97,9 @@ describe("LeakTerminal", () => {
     capturedHandlers.onEvent?.({ type: "failed", reason: "timeout exceeded" });
 
     await waitFor(() => {
-      expect(screen.getByTestId("leak-terminal")).toHaveTextContent(/scan failed: timeout exceeded/);
+      expect(screen.getByTestId("leak-terminal")).toHaveTextContent(
+        /scan failed: timeout exceeded/,
+      );
     });
   });
 
@@ -137,7 +139,10 @@ describe("LeakTerminal", () => {
     // Set up a delayed poll response
     let resolveGetLeakScan: (v: unknown) => void;
     getLeakScanMock.mockImplementation(
-      () => new Promise((resolve) => { resolveGetLeakScan = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          resolveGetLeakScan = resolve;
+        }),
     );
 
     const { unmount } = render(<LeakTerminal scanId="abc" />);
@@ -158,7 +163,10 @@ describe("LeakTerminal", () => {
   it("ignores fallbackPoll error after unmount", async () => {
     let rejectGetLeakScan: (e: unknown) => void;
     getLeakScanMock.mockImplementation(
-      () => new Promise((_resolve, reject) => { rejectGetLeakScan = reject; }),
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectGetLeakScan = reject;
+        }),
     );
 
     const { unmount } = render(<LeakTerminal scanId="abc" />);
