@@ -12,7 +12,7 @@
 ![zod](https://img.shields.io/badge/Zod-boundaries-3068b7?style=flat-square)
 ![rc](https://img.shields.io/badge/react--compiler-enabled-ff69b4?style=flat-square)
 ![vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=flat-square&logo=vercel&logoColor=white)
-![tests](https://img.shields.io/badge/tests-80%2B%20unit-6e9f18?style=flat-square)
+![tests](https://img.shields.io/badge/tests-108%20unit-6e9f18?style=flat-square)
 ![biome](https://img.shields.io/badge/lint-Biome-60a5fa?style=flat-square)
 ![license](https://img.shields.io/badge/license-BUSL--1.1-lightgrey?style=flat-square)
 
@@ -188,7 +188,7 @@ src/
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
 | **QR** | qrcode.react (client) + backend `/qr` (server-rendered PNG) |
-| **Testing** | Vitest + Testing Library (unit, 80+ tests) · Playwright (e2e, live backend) |
+| **Testing** | Vitest + Testing Library (108 unit tests, 100% coverage) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -247,7 +247,8 @@ pnpm test:e2e                # Playwright chromium (live backend)
 
 | Metric | Value |
 |---|---|
-| **Unit tests** | 80+ tests across components + lib (Vitest + jsdom) |
+| **Unit tests** | 108 tests across components + lib (Vitest + jsdom) |
+| **Line coverage** | **100%** |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |
 | **Zod coverage** | Discriminated unions at env, API, SSE boundaries |
@@ -260,7 +261,7 @@ CI (`.github/workflows/ci.yml`) runs lint → typecheck → vitest → next buil
 
 | Principle | How it shows up |
 |---|---|
-| 🧪 **Spec-TDD** | 80+ unit tests landed before the first component was written. Failing test before every feature. |
+| 🧪 **Spec-TDD** | 108 unit tests landed before the first component was written. Failing test before every feature. |
 | 🛡️ **Negative-space programming** | Zod discriminated unions reject malformed payloads at every boundary. RSC error/not-found boundaries catch invalid certificate IDs. |
 | 🧬 **Parse, don't validate** | Zod at every edge: env, REST, SSE. No `any`, no unsafe casts, no optional-chain bug masks. |
 | 🏗️ **Separation of concerns** | `app/` thin RSC shells · `components/` pure + dumb · `lib/` owns side effects. |
