@@ -89,4 +89,28 @@ describe("openLeakScanStream", () => {
     MockEventSource.instances[0].open();
     expect(onOpen).toHaveBeenCalledOnce();
   });
+
+  it("silently ignores events that fail Zod validation", () => {
+    const onEvent = vi.fn();
+    const onError = vi.fn();
+
+    openLeakScanStream("scan-1", { onEvent, onError });
+    const src = MockEventSource.instances[0];
+    // Valid JSON but not a valid LeakEvent (unknown type)
+    src.emit({ type: "unknown_event_type", extra: true });
+
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("forwards native EventSource errors via onerror", () => {
+    const onEvent = vi.fn();
+    const onError = vi.fn();
+
+    openLeakScanStream("scan-1", { onEvent, onError });
+    const src = MockEventSource.instances[0];
+    src.error();
+
+    expect(onError).toHaveBeenCalledOnce();
+  });
 });

@@ -87,6 +87,34 @@ describe("CertificateCard", () => {
     expect(screen.getByTestId("cert-key-id")).toHaveTextContent("—");
   });
 
+  it("reads key_id from signature when signer is absent", () => {
+    render(
+      <CertificateCard
+        {...defaultProps}
+        cert={{ ...cert, manifest: { signature: { key_id: "sig-key-123" } } }}
+      />,
+    );
+    expect(screen.getByTestId("cert-key-id")).toHaveTextContent(/sig-key-123/);
+  });
+
+  it("renders '—' when manifest node has non-string key_id", () => {
+    render(
+      <CertificateCard
+        {...defaultProps}
+        cert={{ ...cert, manifest: { signature: { key_id: 12345 }, signer: { key_id: null } } }}
+      />,
+    );
+    expect(screen.getByTestId("cert-key-id")).toHaveTextContent("—");
+  });
+
+  it("handles clipboard rejection without crashing", async () => {
+    clipboardWriteText.mockRejectedValueOnce(new DOMException("denied"));
+    render(<CertificateCard {...defaultProps} />);
+    fireEvent.click(screen.getByTestId("cert-hash"));
+    // No error thrown - silent failure
+    await Promise.resolve();
+  });
+
   it("share button copies the full certificate URL", async () => {
     render(<CertificateCard {...defaultProps} />);
     fireEvent.click(screen.getByTestId("cert-share"));

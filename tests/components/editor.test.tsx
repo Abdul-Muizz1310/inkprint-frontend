@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -92,5 +92,86 @@ describe("Editor", () => {
     await user.type(screen.getByTestId("editor-root"), "this is way too long");
     await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
     expect(screen.getByTestId("editor-fingerprint-button")).toBeDisabled();
+  });
+
+  it("extracts msg from validation-style array detail", async () => {
+    const { ApiError } = await import("@/lib/api");
+    createCertificateMock.mockRejectedValueOnce(
+      new ApiError(422, { detail: [{ msg: "field required", loc: ["body", "text"] }] }),
+    );
+
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.type(screen.getByTestId("editor-root"), "hello");
+    await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
+    await user.click(screen.getByTestId("editor-fingerprint-button"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("field required");
+  });
+
+  it("falls back to generic message when detail is not a string or array", async () => {
+    const { ApiError } = await import("@/lib/api");
+    createCertificateMock.mockRejectedValueOnce(new ApiError(500, { detail: 42 }));
+
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.type(screen.getByTestId("editor-root"), "hello");
+    await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
+    await user.click(screen.getByTestId("editor-fingerprint-button"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("request failed (500)");
+  });
+
+  it("falls back to generic message when body has no detail key", async () => {
+    const { ApiError } = await import("@/lib/api");
+    createCertificateMock.mockRejectedValueOnce(new ApiError(503, { error: "nope" }));
+
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.type(screen.getByTestId("editor-root"), "hello");
+    await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
+    await user.click(screen.getByTestId("editor-fingerprint-button"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("request failed (503)");
+  });
+
+  it("extracts msg from array detail where first element has no msg", async () => {
+    const { ApiError } = await import("@/lib/api");
+    createCertificateMock.mockRejectedValueOnce(
+      new ApiError(422, { detail: [{ loc: ["body"] }] }),
+    );
+
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.type(screen.getByTestId("editor-root"), "hello");
+    await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
+    await user.click(screen.getByTestId("editor-fingerprint-button"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("request failed (422)");
+  });
+
+  it("does nothing when submit is called while disabled", async () => {
+    render(<Editor />);
+    // Form submit with empty fields - button is disabled, onSubmit early-returns
+    const form = screen.getByTestId("editor-fingerprint-button").closest("form")!;
+    fireEvent.submit(form);
+    expect(createCertificateMock).not.toHaveBeenCalled();
+  });
+
+  it("shows unexpected error for non-ApiError exceptions", async () => {
+    createCertificateMock.mockRejectedValueOnce(new TypeError("something broke"));
+
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.type(screen.getByTestId("editor-root"), "hello");
+    await user.type(screen.getByTestId("editor-author-input"), "a@b.c");
+    await user.click(screen.getByTestId("editor-fingerprint-button"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("unexpected error. please try again.");
   });
 });
