@@ -188,7 +188,7 @@ src/
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
 | **QR** | qrcode.react (client) + backend `/qr` (server-rendered PNG) |
-| **Testing** | Vitest + Testing Library (108 unit tests, 100% coverage) · Playwright (e2e, live backend) |
+| **Testing** | Vitest + Testing Library (108 unit tests, ~59% line coverage over all src) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -248,7 +248,7 @@ pnpm test:e2e                # Playwright chromium (live backend)
 | Metric | Value |
 |---|---|
 | **Unit tests** | 108 tests across components + lib (Vitest + jsdom) |
-| **Line coverage** | **100%** |
+| **Line coverage** | **58.84%** (183/311 lines over all `src/`; 100% over the modules the unit suite exercises) |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |
 | **Zod coverage** | Discriminated unions at env, API, SSE boundaries |
