@@ -11,9 +11,11 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
-      all: true,
+      // `include` already forces every src file into the denominator (vitest 4
+      // makes the old `all: true` the default; the explicit key no longer
+      // typechecks), so uncovered files still count toward the honest total.
       include: ["src/**"],
-      thresholds: { lines: 55, statements: 55, functions: 55, branches: 45 },
+      thresholds: { lines: 68, statements: 68, functions: 73, branches: 65 },
     },
   },
   resolve: {
