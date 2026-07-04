@@ -22,8 +22,6 @@ const defaultProps = {
   cert,
   digestPreview: "lorem ipsum dolor sit amet",
   verifyUrl: "http://localhost:3000/verify?id=550e8400-e29b-41d4-a716-446655440000",
-  qrUrl:
-    "https://inkprint-backend.onrender.com/certificates/550e8400-e29b-41d4-a716-446655440000/qr",
 };
 
 const clipboardWriteText = vi.fn<(text: string) => Promise<void>>(async () => {});
@@ -149,10 +147,14 @@ describe("CertificateCard", () => {
     expect(createObjectURL).toHaveBeenCalled();
   });
 
-  it("renders the QR image with fixed dimensions", () => {
+  it("renders a client-side SVG QR (single source of truth, no backend img)", () => {
     render(<CertificateCard {...defaultProps} />);
     const qr = screen.getByTestId("cert-qr");
     expect(qr).toBeInTheDocument();
+    // COR-2: the QR is rendered from verifyUrl via qrcode.react, matching the
+    // footer text — not a backend <img> that could encode a divergent URL.
+    expect(qr.querySelector("svg")).toBeInTheDocument();
+    expect(qr.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("renders the verify footer with the cert id", () => {

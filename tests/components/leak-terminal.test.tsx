@@ -137,7 +137,7 @@ describe("LeakTerminal", () => {
 
   it("ignores fallbackPoll result after unmount", async () => {
     // Set up a delayed poll response
-    let resolveGetLeakScan: (v: unknown) => void;
+    let resolveGetLeakScan: (v: unknown) => void = () => {};
     getLeakScanMock.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -151,7 +151,7 @@ describe("LeakTerminal", () => {
     // Unmount before the poll resolves
     unmount();
     // Now resolve the poll - the cancelled flag should prevent state update
-    resolveGetLeakScan!({
+    resolveGetLeakScan({
       scan_id: "abc",
       status: "done",
       hits: [],
@@ -161,7 +161,7 @@ describe("LeakTerminal", () => {
   });
 
   it("ignores fallbackPoll error after unmount", async () => {
-    let rejectGetLeakScan: (e: unknown) => void;
+    let rejectGetLeakScan: (e: unknown) => void = () => {};
     getLeakScanMock.mockImplementation(
       () =>
         new Promise((_resolve, reject) => {
@@ -173,7 +173,7 @@ describe("LeakTerminal", () => {
     capturedHandlers.onError?.(new Event("error"));
     unmount();
     // Reject after unmount
-    rejectGetLeakScan!(new Error("network"));
+    rejectGetLeakScan(new Error("network"));
     await new Promise((r) => setTimeout(r, 0));
   });
 
@@ -217,6 +217,49 @@ describe("LeakTerminal", () => {
     });
     // No snapshot suffix
     expect(screen.getByTestId("leak-terminal")).not.toHaveTextContent(/\(/);
+  });
+
+  it("closes the EventSource on the 'done' terminal event", async () => {
+    getLeakScanMock.mockResolvedValueOnce({ scan_id: "abc", status: "done", hits: [] });
+    render(<LeakTerminal scanId="abc" />);
+    capturedHandlers.onEvent?.({ type: "done" });
+    await waitFor(() => expect(closeMock).toHaveBeenCalled());
+  });
+
+  it("closes the EventSource on the 'failed' terminal event", () => {
+    render(<LeakTerminal scanId="abc" />);
+    capturedHandlers.onEvent?.({ type: "failed", reason: "boom" });
+    expect(closeMock).toHaveBeenCalled();
+  });
+
+  it("closes the EventSource before falling back to polling on error", async () => {
+    getLeakScanMock.mockResolvedValueOnce({ scan_id: "abc", status: "done", hits: [] });
+    render(<LeakTerminal scanId="abc" />);
+    capturedHandlers.onError?.(new Event("error"));
+    // close() must fire so the browser cannot silently auto-reconnect.
+    expect(closeMock).toHaveBeenCalled();
+    await waitFor(() => expect(getLeakScanMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("polls at most once even if onError fires repeatedly (one-shot guard)", async () => {
+    getLeakScanMock.mockResolvedValue({ scan_id: "abc", status: "running", hits: [] });
+    render(<LeakTerminal scanId="abc" />);
+    capturedHandlers.onError?.(new Event("error"));
+    capturedHandlers.onError?.(new Event("error"));
+    capturedHandlers.onError?.(new Event("error"));
+    await waitFor(() => expect(getLeakScanMock).toHaveBeenCalled());
+    expect(getLeakScanMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not poll again when onError fires after a 'done' event", async () => {
+    getLeakScanMock.mockResolvedValue({ scan_id: "abc", status: "done", hits: [] });
+    render(<LeakTerminal scanId="abc" />);
+    capturedHandlers.onEvent?.({ type: "done" });
+    await waitFor(() => expect(getLeakScanMock).toHaveBeenCalledTimes(1));
+    // A late reconnect error after termination must be ignored.
+    capturedHandlers.onError?.(new Event("error"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(getLeakScanMock).toHaveBeenCalledTimes(1);
   });
 
   it("renders hit cards when finalResult has hits", async () => {

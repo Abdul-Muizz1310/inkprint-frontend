@@ -4,6 +4,8 @@ import {
   DiffResponse,
   DiffVerdict,
   LeakScanResponse,
+  LeakScanResult,
+  ManifestResponse,
   VerifyResponse,
 } from "@/lib/schemas";
 
@@ -41,6 +43,20 @@ describe("CertificateResponse", () => {
     expect(() =>
       CertificateResponse.parse({ ...validCert, extra_future_field: "x" }),
     ).not.toThrow();
+  });
+
+  it("parses an optional content_preview when present", () => {
+    const parsed = CertificateResponse.parse({ ...validCert, content_preview: "first chars" });
+    expect(parsed.content_preview).toBe("first chars");
+  });
+
+  it("leaves content_preview undefined when absent", () => {
+    const parsed = CertificateResponse.parse(validCert);
+    expect(parsed.content_preview).toBeUndefined();
+  });
+
+  it("rejects a non-string content_preview", () => {
+    expect(() => CertificateResponse.parse({ ...validCert, content_preview: 123 })).toThrow();
   });
 });
 
@@ -115,6 +131,57 @@ describe("LeakScanResponse", () => {
       LeakScanResponse.parse({
         scan_id: "550e8400-e29b-41d4-a716-446655440000",
         status: "exploded",
+      }),
+    ).toThrow();
+  });
+});
+
+describe("ManifestResponse", () => {
+  it("parses an arbitrary JSON object", () => {
+    const parsed = ManifestResponse.parse({ "@context": "https://c2pa.org", claim: { x: 1 } });
+    expect(parsed["@context"]).toBe("https://c2pa.org");
+  });
+
+  it("rejects non-object payloads (arrays, strings, null)", () => {
+    expect(() => ManifestResponse.parse(["a"])).toThrow();
+    expect(() => ManifestResponse.parse("nope")).toThrow();
+    expect(() => ManifestResponse.parse(null)).toThrow();
+  });
+});
+
+describe("LeakScanResult", () => {
+  it("parses a done result and keeps hits + passthrough fields", () => {
+    const parsed = LeakScanResult.parse({
+      scan_id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "done",
+      hits: [{ corpus: "cc", score: 0.9 }],
+      confidence: 0.8,
+    });
+    expect(parsed.status).toBe("done");
+    expect(parsed.hits).toHaveLength(1);
+    expect((parsed as Record<string, unknown>).confidence).toBe(0.8);
+  });
+
+  it("allows a result without hits (pending/running)", () => {
+    const parsed = LeakScanResult.parse({
+      scan_id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "running",
+    });
+    expect(parsed.hits).toBeUndefined();
+  });
+
+  it("throws on an unknown status", () => {
+    expect(() =>
+      LeakScanResult.parse({ scan_id: "550e8400-e29b-41d4-a716-446655440000", status: "??" }),
+    ).toThrow();
+  });
+
+  it("throws when hits is not an array", () => {
+    expect(() =>
+      LeakScanResult.parse({
+        scan_id: "550e8400-e29b-41d4-a716-446655440000",
+        status: "done",
+        hits: "lots",
       }),
     ).toThrow();
   });

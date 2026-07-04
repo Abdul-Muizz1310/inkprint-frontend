@@ -1,24 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { QRDisplay } from "@/components/qr-display";
 
 describe("QRDisplay", () => {
-  it("renders an SVG when no src is provided", () => {
-    const { container } = render(<QRDisplay value="https://example.com" alt="Verification QR" />);
+  it("renders a client-side SVG QR encoding the given value", () => {
+    const { container } = render(<QRDisplay value="https://example.com/verify?id=abc" />);
+    // Single source of truth: qrcode.react's QRCodeSVG — never a backend <img>.
     expect(container.querySelector("svg")).toBeInTheDocument();
-  });
-
-  it("renders an <img> when src is provided", () => {
-    render(
-      <QRDisplay
-        value="https://example.com"
-        src="https://inkprint-backend.onrender.com/certificates/abc/qr"
-        alt="Verification QR"
-      />,
-    );
-    const img = screen.getByRole("img", { name: /verification qr/i });
-    expect(img).toBeInTheDocument();
-    expect(img).toHaveAttribute("src", "https://inkprint-backend.onrender.com/certificates/abc/qr");
+    expect(container.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("respects the size prop", () => {
