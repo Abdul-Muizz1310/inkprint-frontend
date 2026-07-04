@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, getLeakScan, type LeakScanResult } from "@/lib/api";
 import type { LeakEvent } from "@/lib/schemas";
 import { openLeakScanStream } from "@/lib/sse";
@@ -58,10 +58,24 @@ export function LeakTerminal({ scanId }: LeakTerminalProps) {
   const [status, setStatus] = useState<Status>("pending");
   const [finalResult, setFinalResult] = useState<LeakScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const closeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    // `terminated` is a one-shot latch: once the stream reaches a terminal
+    // state (done/failed) or errors out, we close the EventSource and never
+    // poll again. Without it, a native EventSource auto-reconnects after
+    // `onerror` (readyState → CONNECTING, ~3s retry), and each reconnect
+    // error would fire another unbounded, un-deduped fallbackPoll — exactly
+    // the compounding-retry loop that hits during a Render cold start.
+    let terminated = false;
+    let close: (() => void) | null = null;
+
+    function stop() {
+      if (close) {
+        close();
+        close = null;
+      }
+    }
 
     async function fallbackPoll() {
       try {
@@ -81,27 +95,36 @@ export function LeakTerminal({ scanId }: LeakTerminalProps) {
       }
     }
 
-    const close = openLeakScanStream(scanId, {
+    close = openLeakScanStream(scanId, {
       onEvent: (event) => {
-        if (cancelled) return;
+        if (cancelled || terminated) return;
         setLines((prev) => [...prev, eventLine(event)]);
         if (event.type === "scanning") setStatus("running");
         if (event.type === "done") {
+          terminated = true;
+          stop();
           setStatus("done");
           fallbackPoll();
         }
-        if (event.type === "failed") setStatus("failed");
+        if (event.type === "failed") {
+          terminated = true;
+          stop();
+          setStatus("failed");
+        }
       },
       onError: () => {
-        if (cancelled) return;
+        if (cancelled || terminated) return;
+        // Latch and close before falling back: the stream is dead, so stop
+        // the browser from silently reconnecting, then poll exactly once.
+        terminated = true;
+        stop();
         fallbackPoll();
       },
     });
 
-    closeRef.current = close;
     return () => {
       cancelled = true;
-      close();
+      stop();
     };
   }, [scanId]);
 

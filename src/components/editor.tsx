@@ -4,19 +4,17 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { ApiError, createCertificate } from "@/lib/api";
+import { MAX_TEXT_BYTES, textByteLength } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-
-const DEFAULT_MAX_BYTES = 1_048_576; // 1 MiB
 
 type EditorProps = {
   maxBytes?: number;
 };
 
-function byteLength(s: string): number {
-  return new Blob([s]).size;
-}
-
 function extractErrorMessage(body: unknown, status: number): string {
+  if (status === 0 && body === "timeout") {
+    return "backend timed out — it may be waking up, try again in a moment";
+  }
   if (body && typeof body === "object" && "detail" in body) {
     const detail = (body as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
@@ -32,14 +30,14 @@ function extractErrorMessage(body: unknown, status: number): string {
  * Code-editor block: mac window chrome, line number gutter, monospaced
  * textarea, `$ fingerprint` gradient submit pill.
  */
-export function Editor({ maxBytes = DEFAULT_MAX_BYTES }: EditorProps) {
+export function Editor({ maxBytes = MAX_TEXT_BYTES }: EditorProps) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [author, setAuthor] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const bytes = useMemo(() => byteLength(text), [text]);
+  const bytes = useMemo(() => textByteLength(text), [text]);
   const overLimit = bytes > maxBytes;
 
   const disabled = !text.trim() || !author.trim() || submitting || overLimit;

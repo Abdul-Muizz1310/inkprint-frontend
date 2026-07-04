@@ -12,7 +12,7 @@ export type LeakStreamHandlers = {
  * Returns a `close()` function the caller must invoke on unmount.
  */
 export function openLeakScanStream(scanId: string, handlers: LeakStreamHandlers): () => void {
-  const url = `${env.NEXT_PUBLIC_API_URL}/leak-scan/${scanId}/stream`;
+  const url = `${env.NEXT_PUBLIC_API_URL}/leak-scan/${encodeURIComponent(scanId)}/stream`;
   const source = new EventSource(url);
 
   source.onopen = () => handlers.onOpen?.();

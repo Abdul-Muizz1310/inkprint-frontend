@@ -1,38 +1,69 @@
 "use client";
 
 import { AlertTriangle, Check, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { LegalDisclaimer } from "@/components/legal-disclaimer";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, getCertificateManifest, verifyManifest } from "@/lib/api";
+import { ApiError, getCertificateManifest, isTimeoutError, verifyManifest } from "@/lib/api";
+import { isUuid } from "@/lib/ids";
 import type { VerifyResponse } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
-export default function VerifyPage() {
+function VerifyPageInner() {
+  const searchParams = useSearchParams();
   const [manifestText, setManifestText] = useState("");
   const [originalText, setOriginalText] = useState("");
   const [certIdInput, setCertIdInput] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [manifestLoading, setManifestLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResponse | null>(null);
 
-  const onLoadFromCertId = useCallback(async () => {
+  const loadManifest = useCallback(async (rawId: string) => {
+    const id = rawId.trim();
     setApiError(null);
     setParseError(null);
+    // Negative-space + security: never splice a non-UUID id into the fetch URL.
+    if (!isUuid(id)) {
+      setApiError("enter a valid certificate id (uuid)");
+      return;
+    }
+    setManifestLoading(true);
     try {
-      const manifest = await getCertificateManifest(certIdInput.trim());
+      const manifest = await getCertificateManifest(id);
       setManifestText(JSON.stringify(manifest, null, 2));
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setApiError("certificate not found");
+      } else if (isTimeoutError(err)) {
+        setApiError("backend timed out — it may be waking up, try again in a moment");
       } else {
         setApiError("failed to load manifest");
       }
+    } finally {
+      setManifestLoading(false);
     }
-  }, [certIdInput]);
+  }, []);
+
+  // COR-1: honor the certificate's own /verify?id=<uuid> deep-link and QR
+  // target. Seed the input and auto-load the manifest on arrival so the
+  // headline verification path works without manual copy-paste.
+  const idParam = searchParams.get("id");
+  useEffect(() => {
+    if (idParam && isUuid(idParam)) {
+      setCertIdInput(idParam);
+      loadManifest(idParam);
+    }
+  }, [idParam, loadManifest]);
+
+  const onLoadFromCertId = useCallback(
+    () => loadManifest(certIdInput),
+    [certIdInput, loadManifest],
+  );
 
   const onVerify = useCallback(async () => {
     setParseError(null);
@@ -55,7 +86,9 @@ export default function VerifyPage() {
       });
       setResult(response);
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (isTimeoutError(err)) {
+        setApiError("backend timed out — it may be waking up, try again in a moment");
+      } else if (err instanceof ApiError) {
         setApiError(`request failed (${err.status})`);
       } else {
         setApiError("unexpected error. please try again.");
@@ -107,10 +140,10 @@ export default function VerifyPage() {
                 <button
                   type="button"
                   onClick={onLoadFromCertId}
-                  disabled={!certIdInput.trim()}
+                  disabled={!certIdInput.trim() || manifestLoading}
                   className="rounded-lg border border-border-bright bg-background/60 px-4 font-mono text-xs text-foreground transition hover:border-accent-ink/60 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  load
+                  {manifestLoading ? "loading…" : "load"}
                 </button>
               </div>
             </div>
@@ -252,5 +285,14 @@ export default function VerifyPage() {
         </div>
       </div>
     </PageFrame>
+  );
+}
+
+// useSearchParams requires a Suspense boundary during static rendering.
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyPageInner />
+    </Suspense>
   );
 }

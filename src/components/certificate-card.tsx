@@ -13,7 +13,6 @@ type CertificateCardProps = {
   cert: CertificateResponse;
   digestPreview: string;
   verifyUrl: string;
-  qrUrl: string;
 };
 
 function readKeyId(manifest: Record<string, unknown>): string | null {
@@ -38,7 +37,7 @@ async function copyToClipboard(text: string) {
   }
 }
 
-export function CertificateCard({ cert, digestPreview, verifyUrl, qrUrl }: CertificateCardProps) {
+export function CertificateCard({ cert, digestPreview, verifyUrl }: CertificateCardProps) {
   const shareUrl = `${env.NEXT_PUBLIC_SITE_URL}/certificates/${cert.id}`;
   const keyId = formatKeyId(readKeyId(cert.manifest));
 
@@ -121,7 +120,7 @@ export function CertificateCard({ cert, digestPreview, verifyUrl, qrUrl }: Certi
             data-testid="cert-qr"
             className="shrink-0 rounded-lg border border-border bg-background/60 p-2"
           >
-            <QRDisplay value={verifyUrl} src={qrUrl} size={112} alt="Verification QR" />
+            <QRDisplay value={verifyUrl} size={112} title="Verification QR" />
           </div>
         </div>
 

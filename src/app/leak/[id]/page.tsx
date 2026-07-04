@@ -3,8 +3,7 @@ import { LeakTerminal } from "@/components/leak-terminal";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/ids";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -12,7 +11,7 @@ type PageProps = {
 
 export default async function LeakScanPage({ params }: PageProps) {
   const { id } = await params;
-  if (!UUID_RE.test(id)) notFound();
+  if (!isUuid(id)) notFound();
 
   return (
     <PageFrame

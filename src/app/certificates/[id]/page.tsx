@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { CertificateCard } from "@/components/certificate-card";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, getCertificate, getCertificateDownload, getCertificateQrUrl } from "@/lib/api";
+import { ApiError, getCertificate, getCertificateDownloadPreview } from "@/lib/api";
+import { PREVIEW_CHARS } from "@/lib/constants";
 import { env } from "@/lib/env";
+import { isUuid } from "@/lib/ids";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -13,10 +15,13 @@ type PageProps = {
 export default async function CertificatePage({ params }: PageProps) {
   const { id } = await params;
 
+  // Negative-space: reject malformed ids before any backend round-trip,
+  // matching the /compare and /leak/[id] gates.
+  if (!isUuid(id)) notFound();
+
   let cert: Awaited<ReturnType<typeof getCertificate>>;
-  let text: string;
   try {
-    [cert, text] = await Promise.all([getCertificate(id), getCertificateDownload(id)]);
+    cert = await getCertificate(id);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       notFound();
@@ -24,9 +29,28 @@ export default async function CertificatePage({ params }: PageProps) {
     throw err;
   }
 
-  const digestPreview = text.slice(0, 200);
+  // The card shows only the first PREVIEW_CHARS of the body (OPT-2). Never pull
+  // the whole (up to ~1 MiB) document just to slice a short preview:
+  //   - if the backend supplies `content_preview`, use it and make zero extra
+  //     round-trips;
+  //   - otherwise fetch only the leading prefix (Range + streamed early-cancel),
+  //     which transfers kilobytes rather than the full body.
+  let previewSource: string;
+  if (typeof cert.content_preview === "string") {
+    previewSource = cert.content_preview;
+  } else {
+    try {
+      previewSource = await getCertificateDownloadPreview(id, PREVIEW_CHARS);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        notFound();
+      }
+      throw err;
+    }
+  }
+
+  const digestPreview = previewSource.slice(0, PREVIEW_CHARS);
   const verifyUrl = `${env.NEXT_PUBLIC_SITE_URL}/verify?id=${cert.id}`;
-  const qrUrl = getCertificateQrUrl(cert.id);
   const shortId = cert.id.slice(0, 8);
 
   return (
@@ -52,12 +76,7 @@ export default async function CertificatePage({ params }: PageProps) {
           strong
           bodyClassName="p-0"
         >
-          <CertificateCard
-            cert={cert}
-            digestPreview={digestPreview}
-            verifyUrl={verifyUrl}
-            qrUrl={qrUrl}
-          />
+          <CertificateCard cert={cert} digestPreview={digestPreview} verifyUrl={verifyUrl} />
         </TerminalWindow>
 
         <div className="mt-6 text-center font-mono text-xs text-fg-muted">

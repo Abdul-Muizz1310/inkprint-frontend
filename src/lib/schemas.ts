@@ -24,6 +24,12 @@ export const CertificateResponse = z
     signature: z.string(),
     manifest: z.record(z.string(), z.unknown()),
     storage_key: z.string(),
+    // Optional server-rendered preview of the document's leading characters.
+    // When present, the certificate page renders the digest preview from this
+    // field instead of downloading the entire (up to ~1 MiB) document body.
+    // Absent on backends that don't yet expose it → callers fall back to the
+    // full download. Typed + parsed here so consumers never `as`-cast it.
+    content_preview: z.string().optional(),
   })
   .passthrough();
 export type CertificateResponse = z.infer<typeof CertificateResponse>;
@@ -58,6 +64,33 @@ export const LeakScanResponse = z.object({
   status: z.enum(["pending", "running", "done", "failed"]),
 });
 export type LeakScanResponse = z.infer<typeof LeakScanResponse>;
+
+/**
+ * The manifest is an opaque C2PA JSON object. We do not own its internal
+ * schema (the backend / C2PA spec does), but we still refuse anything that
+ * isn't a JSON object at the boundary — never a raw `as` cast.
+ */
+export const ManifestResponse = z.record(z.string(), z.unknown());
+export type ManifestResponse = z.infer<typeof ManifestResponse>;
+
+/**
+ * Polled leak-scan result. `status` is validated against the same enum as
+ * the create response; `hits` (present once the scan is done) is an opaque
+ * array whose element shape the backend owns. `.passthrough()` keeps any
+ * extra fields the backend adds without silently dropping them.
+ *
+ * (A full discriminated-union per status would require the backend to
+ * document a distinct shape per state, which it does not; parsing the
+ * discriminant + the one field the UI reads is the honest boundary here.)
+ */
+export const LeakScanResult = z
+  .object({
+    scan_id: z.string(),
+    status: z.enum(["pending", "running", "done", "failed"]),
+    hits: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+export type LeakScanResult = z.infer<typeof LeakScanResult>;
 
 /**
  * Streaming event union for the /leak-scan/{id}/stream SSE feed.

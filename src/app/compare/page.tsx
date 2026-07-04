@@ -5,11 +5,10 @@ import { DiffView } from "@/components/diff-view";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, diffText, getCertificateDownload } from "@/lib/api";
+import { ApiError, diffText, getCertificateDownload, isTimeoutError } from "@/lib/api";
+import { isUuid } from "@/lib/ids";
 import type { DiffResponse } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CompareState = {
   original: string;
@@ -24,7 +23,7 @@ export default function ComparePage() {
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<CompareState | null>(null);
 
-  const validParent = UUID_RE.test(parentId.trim());
+  const validParent = isUuid(parentId.trim());
   const canSubmit = validParent && newText.trim().length > 0 && !loading;
 
   const onCompare = useCallback(async () => {
@@ -39,7 +38,9 @@ export default function ComparePage() {
       ]);
       setState({ original, current: newText, diff });
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (isTimeoutError(err)) {
+        setError("backend timed out — it may be waking up, try again in a moment");
+      } else if (err instanceof ApiError) {
         setError(
           err.status === 404 ? "parent certificate not found" : `request failed (${err.status})`,
         );
