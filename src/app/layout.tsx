@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Geist, Geist_Mono } from "next/font/google";
-import { Providers } from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,7 +35,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} antialiased`}
     >
       <body className="relative bg-background text-foreground bg-grid bg-scanlines">
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );
