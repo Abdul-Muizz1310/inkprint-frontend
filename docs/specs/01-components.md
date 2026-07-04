@@ -107,6 +107,7 @@ export class ApiError extends Error {
 export async function createCertificate(input: {text: string; author: string}): Promise<CertificateResponse>
 export async function getCertificate(id: string): Promise<CertificateResponse>
 export async function getCertificateDownload(id: string): Promise<string>
+export async function getCertificateDownloadPreview(id: string, maxChars?: number): Promise<string>  // OPT-2: prefix-only
 export async function getCertificateManifest(id: string): Promise<Record<string, unknown>>
 export async function verifyManifest(input: {manifest: Record<string, unknown>; text?: string}): Promise<VerifyResponse>
 export async function diffText(input: {parent_id: string; text: string}): Promise<DiffResponse>
@@ -117,7 +118,8 @@ export async function getLeakScan(scan_id: string): Promise<LeakScanResult>  // 
 ### Invariants
 - `Content-Type: application/json` set on every POST.
 - Non-2xx → throw `ApiError(status, body)`. The caller decides what to render.
-- `getCertificateDownload` returns `response.text()` (backend returns plain text).
+- `getCertificateDownload` returns `response.text()` (backend returns plain text). Used by `/compare`, which needs the whole body to diff it.
+- `getCertificateDownloadPreview(id, maxChars=PREVIEW_CHARS)` (OPT-2) returns only the leading `maxChars` characters: sends `Range: bytes=0-N` and streams the response, cancelling the reader once it has enough — so the certificate page never transfers the full body just to render a short preview. `no-store` (Next's data cache would buffer the whole body and defeat the early-cancel).
 - `getCertificateQrUrl(id)` — **not** a fetch; returns the full URL string so `<img src>` can consume it directly.
 - Never mutates inputs. Never logs secrets (there aren't any on the client, but the pattern stands).
 
@@ -129,6 +131,7 @@ export async function getLeakScan(scan_id: string): Promise<LeakScanResult>  // 
 - **getCertificate parses into CertificateResponse**: happy 200 passes Zod.
 - **getCertificate malformed body**: Zod throws (not ApiError — test asserts the thrown type).
 - **getCertificateDownload returns string**: mock `text/plain` body.
+- **getCertificateDownloadPreview (OPT-2)**: sends a `Range` header; slices to `maxChars` by characters (multibyte-safe); cancels the stream early so only a small prefix crosses the wire even for a large body; `no-store`; `404 → ApiError`.
 - **verifyManifest body is forwarded**: assert fetch mock called with JSON-stringified body.
 - **diffText body is forwarded**.
 - **createLeakScan returns 202 body** parsed.

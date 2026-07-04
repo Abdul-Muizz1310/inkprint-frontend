@@ -12,7 +12,7 @@
 ![zod](https://img.shields.io/badge/Zod-boundaries-3068b7?style=flat-square)
 ![rc](https://img.shields.io/badge/react--compiler-enabled-ff69b4?style=flat-square)
 ![vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=flat-square&logo=vercel&logoColor=white)
-![tests](https://img.shields.io/badge/tests-108%20unit-6e9f18?style=flat-square)
+![tests](https://img.shields.io/badge/tests-181%20unit-6e9f18?style=flat-square)
 ![biome](https://img.shields.io/badge/lint-Biome-60a5fa?style=flat-square)
 ![license](https://img.shields.io/badge/license-BUSL--1.1-lightgrey?style=flat-square)
 
@@ -38,7 +38,7 @@ $ pnpm dev
 **The certificate is the payoff.** Users paste their text, get a cryptographically signed provenance certificate, and can immediately verify it, compare derivatives, or scan for training-data leaks — all in one interface.
 
 - 🖼️ **The certificate page is a React Server Component.** `/certificates/[id]` fetches + parses on the server and hands a typed object to a pure presentational `CertificateCard`. No loading flicker on the one page where the visual has to land instantly.
-- 🛡️ **Zod at every boundary.** Every response from the backend is parsed through a Zod schema before it reaches React. Schema drift fails loud at the edge — caught a real 64-bit simhash overflow bug during the first live E2E, not as a mysterious `undefined` later.
+- 🛡️ **Zod at every boundary.** Every response from the backend — including the opaque C2PA manifest (`z.record`) and the polled leak-scan result (status-enum + passthrough) — is parsed through a Zod schema before it reaches React. No raw `as` casts at the network edge. Schema drift fails loud at the boundary — caught a real 64-bit simhash overflow bug during the first live E2E, not as a mysterious `undefined` later.
 - 🎯 **Live-backend E2E.** The Playwright happy path runs against the *real* production backend. No mocks. That's how CORS and schema drift get caught for free.
 - 🧪 **Red-first Spec-TDD.** Every feature had a failing test before a line of implementation existed — 80+ unit tests landed before the first component was written.
 
@@ -130,7 +130,6 @@ src/
 ├── app/
 │   ├── page.tsx                      # Home: text editor + fingerprint button
 │   ├── layout.tsx                    # Root layout + metadata
-│   ├── providers.tsx                 # TanStack Query provider
 │   ├── certificates/[id]/
 │   │   ├── page.tsx                  # RSC — server-fetched certificate view
 │   │   ├── error.tsx                 # Error boundary
@@ -154,9 +153,11 @@ src/
 │   └── ui/                           # shadcn primitives (base-nova)
 └── lib/
     ├── env.ts                        # Runtime env validation (Zod)
-    ├── api.ts                        # TanStack Query hooks + typed fetch
-    ├── sse.ts                        # SSE EventSource hook with Zod validation
+    ├── api.ts                        # typed fetch client — Zod-parsed, 30s timeout, ApiError
+    ├── sse.ts                        # SSE EventSource wrapper with Zod validation
     ├── schemas.ts                    # Zod schemas for all API contracts
+    ├── ids.ts                        # shared UUID gate (isUuid) for every id-taking path
+    ├── constants.ts                  # MAX_TEXT_BYTES (mirrors backend body limit)
     ├── format.ts                     # Formatting utilities
     └── utils.ts                      # cn() (clsx + tailwind-merge)
 ```
@@ -184,11 +185,11 @@ src/
 | **Framework** | Next.js 16 (App Router, React Server Components, React Compiler) |
 | **UI** | React 19 · TypeScript strict |
 | **Styling** | Tailwind CSS v4 · shadcn/ui (base-nova) · lucide-react |
-| **State** | Zustand + TanStack Query v5 |
+| **State** | Local React state (`useState`/`useEffect`) — no global store; RSC fetches on the server, client pages own one-shot form state |
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
-| **QR** | qrcode.react (client) + backend `/qr` (server-rendered PNG) |
-| **Testing** | Vitest + Testing Library (108 unit tests, ~59% line coverage over all src) · Playwright (e2e, live backend) |
+| **QR** | qrcode.react — client-rendered SVG encoding the `/verify?id=` link (single source of truth) |
+| **Testing** | Vitest + Testing Library (181 unit tests incl. route-layer, ~95% line coverage over all src) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -247,8 +248,8 @@ pnpm test:e2e                # Playwright chromium (live backend)
 
 | Metric | Value |
 |---|---|
-| **Unit tests** | 108 tests across components + lib (Vitest + jsdom) |
-| **Line coverage** | **58.84%** (183/311 lines over all `src/`; 100% over the modules the unit suite exercises) |
+| **Unit tests** | 181 tests across app routes + components + lib (Vitest + jsdom) |
+| **Line coverage** | **94.61%** (334/353 lines over all `src/`); the route layer (`certificates/[id]`, `verify`, `compare`, `leak/[id]`) is now unit-covered, not just by the deferred e2e |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |
 | **Zod coverage** | Discriminated unions at env, API, SSE boundaries |

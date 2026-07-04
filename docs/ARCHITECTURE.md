@@ -45,7 +45,7 @@ src/
 ├── app/            # routes (RSC by default; "use client" only where needed)
 │   ├── page.tsx                       # / — landing + editor
 │   ├── certificates/[id]/
-│   │   ├── page.tsx                   # RSC — parallel fetch cert + first 200 chars
+│   │   ├── page.tsx                   # RSC — fetch cert; derive 200-char preview (from content_preview, else download)
 │   │   ├── not-found.tsx              # 404 surface
 │   │   └── error.tsx                  # 5xx surface with reset()
 │   ├── verify/page.tsx                # client — manifest paste + check
@@ -57,14 +57,15 @@ src/
 │   ├── editor.tsx                     # textarea + author + submit
 │   ├── diff-view.tsx                  # react-diff-viewer-continued wrapper
 │   ├── leak-terminal.tsx              # owns the SSE connection
-│   ├── qr-display.tsx                 # QR via qrcode.react OR <img> from backend
+│   ├── qr-display.tsx                 # QR via qrcode.react (client-rendered SVG, single source of truth)
 │   ├── verdict-badge.tsx              # 5 diff verdicts, colour-coded
 │   └── legal-disclaimer.tsx           # "Not legal advice" note
 │
 └── lib/            # shared, pure, no-React
     ├── env.ts                         # Zod-validated NEXT_PUBLIC_* (fails loud at import time)
-    ├── schemas.ts                     # Zod mirrors of every backend response + LeakEvent union
-    ├── api.ts                         # typed fetch client; ApiError for every failure
+    ├── schemas.ts                     # Zod mirrors of every backend response (incl. manifest + leak result) + LeakEvent union
+    ├── api.ts                         # typed fetch client; Zod-parses every response, 30s AbortSignal timeout, ApiError for every failure
+    ├── ids.ts                         # shared UUID gate (isUuid) — the single validation choke-point for id-taking paths
     ├── sse.ts                         # typed EventSource wrapper for leak-scan stream
     ├── format.ts                      # pure formatters (truncateMiddle, formatIssuedAt, formatKeyId)
     └── utils.ts                       # cn() classname helper
@@ -90,10 +91,12 @@ sequenceDiagram
   API-->>E: typed CertificateResponse
   E->>R: router.push(`/certificates/${id}`)
   R->>RSC: navigate
-  RSC->>API: Promise.all([getCertificate, getCertificateDownload])
-  API->>BE: GET /certificates/{id} + /certificates/{id}/download
-  BE-->>API: JSON + text/plain
-  API-->>RSC: parsed cert + preview string
+  RSC->>API: getCertificate(id)
+  API->>BE: GET /certificates/{id}
+  BE-->>API: JSON
+  API->>API: Zod parse → typed
+  Note over RSC,BE: preview = cert.content_preview if present,<br/>else getCertificateDownloadPreview(id) — Range + streamed<br/>early-cancel pulls only a prefix, never the ~1 MiB body
+  API-->>RSC: parsed cert + 200-char preview
   RSC-->>U: styled CertificateCard
 ```
 
@@ -105,6 +108,20 @@ payoff. RSC pre-fetches both endpoints in parallel on the server, so the page
 arrives fully-rendered during the router transition. The only interactive parts
 of the card — copy-hash, share, download-manifest — are isolated inside
 `CertificateCard` as a client island.
+
+Certificates are immutable once issued, so `getCertificate` /
+`getCertificateDownload` are fetched with `next: { revalidate: 3600 }`. A
+widely-shared or QR-linked certificate is therefore served as an ISR-cached
+page instead of re-waking the cold-start-prone free-tier backend on every view.
+
+The digest preview never pulls the full body (OPT-2). When the backend supplies
+`content_preview` the RSC uses it directly; otherwise `getCertificateDownloadPreview`
+requests a `Range: bytes=0-N` window and streams the response, cancelling the
+reader as soon as it has `PREVIEW_CHARS` characters — so even a backend that
+ignores `Range` and answers `200` with a ~1 MiB body has its transfer aborted
+mid-stream. That fetch is intentionally `no-store` (Next's data cache would
+buffer the whole response and defeat the early-cancel); the immutable *metadata*
+fetch still carries the ISR cache.
 
 ## Why Zod at every API boundary
 
@@ -119,14 +136,18 @@ deep. Fix was one-line.
 
 ## Testing boundary
 
-- **Unit/integration (`tests/lib/**`, `tests/components/**`)** — mocked `fetch`,
-  mocked `EventSource`, mocked `next/navigation`. Runs in jsdom via vitest. Red
-  before green per Spec-TDD.
+- **Unit/integration (`tests/lib/**`, `tests/components/**`, `tests/app/**`)** —
+  mocked `fetch`, mocked `EventSource`, mocked `next/navigation`. Runs in jsdom
+  via vitest. Red before green per Spec-TDD. The **route layer is covered here**:
+  `tests/app/` drives the RSC compose logic (UUID gate → parallel fetch → 404 /
+  error branching for `certificates/[id]` and `leak/[id]`) and the client pages'
+  wiring (`verify` deep-link auto-load + UUID gate, `compare` UUID gate + diff),
+  so the router→network layer no longer depends on a test that never runs in CI.
 - **E2E (`tests/e2e/cert-flow.spec.ts`)** — Playwright against the **live**
   backend. No mocks. Catches CORS regressions, schema drift, and real cold-start
-  behaviour for free. Deferred from CI for now because the Render free tier
-  cold-start takes 20–30s on the first POST of a session; local pre-merge runs
-  are the gate.
+  behaviour for free. Still deferred from CI (the Render free tier cold-start
+  takes 20–30s on the first POST of a session), but it is now a *supplementary*
+  live smoke, not the only thing exercising `src/app/`.
 
 ## Deployment topology
 
