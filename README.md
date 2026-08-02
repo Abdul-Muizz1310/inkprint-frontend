@@ -12,7 +12,7 @@
 ![zod](https://img.shields.io/badge/Zod-boundaries-3068b7?style=flat-square)
 ![rc](https://img.shields.io/badge/react--compiler-enabled-ff69b4?style=flat-square)
 ![vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=flat-square&logo=vercel&logoColor=white)
-![tests](https://img.shields.io/badge/tests-181%20unit-6e9f18?style=flat-square)
+![tests](https://img.shields.io/badge/tests-204%20unit-6e9f18?style=flat-square)
 ![biome](https://img.shields.io/badge/lint-Biome-60a5fa?style=flat-square)
 ![license](https://img.shields.io/badge/license-BUSL--1.1-lightgrey?style=flat-square)
 
@@ -40,13 +40,13 @@ $ pnpm dev
 - 🖼️ **The certificate page is a React Server Component.** `/certificates/[id]` fetches + parses on the server and hands a typed object to a pure presentational `CertificateCard`. No loading flicker on the one page where the visual has to land instantly.
 - 🛡️ **Zod at every boundary.** Every response from the backend — including the opaque C2PA manifest (`z.record`) and the polled leak-scan result (status-enum + passthrough) — is parsed through a Zod schema before it reaches React. No raw `as` casts at the network edge. Schema drift fails loud at the boundary — caught a real 64-bit simhash overflow bug during the first live E2E, not as a mysterious `undefined` later.
 - 🎯 **Live-backend E2E.** The Playwright happy path runs against the *real* production backend. No mocks. That's how CORS and schema drift get caught for free.
-- 🧪 **Red-first Spec-TDD.** Every feature had a failing test before a line of implementation existed — 80+ unit tests landed before the first component was written.
+- 🧪 **Red-first Spec-TDD.** Every feature had a failing test before a line of implementation existed.
 
 ---
 
 ## ✨ Features
 
-- 🖋️ Rich text editor with author field and one-click fingerprinting
+- 🖋️ Monospaced text editor with author field and one-click fingerprinting (Monaco was deferred — see `WHY.md`; plain `<textarea>` fallback ships)
 - 📜 Server-rendered certificate page (RSC) — instant visual payoff
 - ✅ Tamper verification with itemised green/red verdict breakdown
 - 📊 Side-by-side diff view for derivative-work comparison
@@ -149,8 +149,7 @@ src/
 │   ├── qr-display.tsx               # QR code render
 │   ├── backend-status.tsx            # Cold / warm / down indicator
 │   ├── legal-disclaimer.tsx          # Legal notice component
-│   ├── terminal/                     # Terminal window, nav, prompt, status bar
-│   └── ui/                           # shadcn primitives (base-nova)
+│   └── terminal/                     # Terminal window, nav, prompt, status bar
 └── lib/
     ├── env.ts                        # Runtime env validation (Zod)
     ├── api.ts                        # typed fetch client — Zod-parsed, 30s timeout, ApiError
@@ -189,7 +188,7 @@ src/
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
 | **QR** | qrcode.react — client-rendered SVG encoding the `/verify?id=` link (single source of truth) |
-| **Testing** | Vitest + Testing Library (181 unit tests incl. route-layer, ~95% line coverage over all src) · Playwright (e2e, live backend) |
+| **Testing** | Vitest + Testing Library (204 unit tests incl. route-layer, 94.96% line coverage over all src) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -248,8 +247,8 @@ pnpm test:e2e                # Playwright chromium (live backend)
 
 | Metric | Value |
 |---|---|
-| **Unit tests** | 181 tests across app routes + components + lib (Vitest + jsdom) |
-| **Line coverage** | **94.61%** (334/353 lines over all `src/`); the route layer (`certificates/[id]`, `verify`, `compare`, `leak/[id]`) is now unit-covered, not just by the deferred e2e |
+| **Unit tests** | 204 tests across app routes + components + lib (Vitest + jsdom) |
+| **Line coverage** | **94.96%** (over all `src/`); the route layer (`certificates/[id]`, `verify`, `compare`, `leak/[id]`) is now unit-covered, not just by the deferred e2e |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |
 | **Zod coverage** | Discriminated unions at env, API, SSE boundaries |
@@ -262,7 +261,7 @@ CI (`.github/workflows/ci.yml`) runs lint → typecheck → vitest → next buil
 
 | Principle | How it shows up |
 |---|---|
-| 🧪 **Spec-TDD** | 108 unit tests landed before the first component was written. Failing test before every feature. |
+| 🧪 **Spec-TDD** | Every unit test landed before the component it covers was written. Failing test before every feature. |
 | 🛡️ **Negative-space programming** | Zod discriminated unions reject malformed payloads at every boundary. RSC error/not-found boundaries catch invalid certificate IDs. |
 | 🧬 **Parse, don't validate** | Zod at every edge: env, REST, SSE. No `any`, no unsafe casts, no optional-chain bug masks. |
 | 🏗️ **Separation of concerns** | `app/` thin RSC shells · `components/` pure + dumb · `lib/` owns side effects. |
