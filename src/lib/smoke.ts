@@ -6,7 +6,9 @@
  * decision of "did the deployed backend respond healthy" is isolated here
  * and unit-tested with a mocked `fetch`, while the actual smoke test
  * (`tests/smoke.test.ts`) only fetches for real when explicitly opted in
- * via an env var.
+ * via the `SMOKE_BASE_URL` env var (a bare origin, e.g.
+ * `https://inkprint-backend.onrender.com`, with no trailing slash or path —
+ * the test appends `/health` itself before calling `checkHealth`).
  */
 
 export type SmokeResult =

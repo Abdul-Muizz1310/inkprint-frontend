@@ -48,3 +48,25 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+
+  # NOTE: no deploy job — the Vercel/Render deploy auto-triggers on push. This
+  # job verifies the backend that deploy depends on actually came up. It is
+  # inert unless the SMOKE_BASE_URL repository variable is set: tests/smoke.test.ts
+  # self-skips and exits 0 without making a single HTTP request, so a fork PR
+  # or a suspended free-tier service can never fail CI. Deliberately kept out
+  # of the `test` job's env so that job's collected test count never changes.
+  smoke:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Post-deploy /health smoke (skipped when SMOKE_BASE_URL is unset)
+        run: pnpm vitest run tests/smoke.test.ts
