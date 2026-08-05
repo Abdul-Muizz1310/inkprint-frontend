@@ -17,15 +17,14 @@ describe("AppNav", () => {
     expect(screen.getByText("api")).toBeInTheDocument();
   });
 
-  it.each([
-    "home",
-    "verify",
-    "compare",
-  ] as const)("marks the %s link active with an underline accent", (active) => {
-    render(<AppNav active={active} />);
-    const link = screen.getByText(active);
-    expect(link.className).toMatch(/after:/);
-  });
+  it.each(["home", "verify", "compare"] as const)(
+    "marks the %s link active with an underline accent",
+    (active) => {
+      render(<AppNav active={active} />);
+      const link = screen.getByText(active);
+      expect(link.className).toMatch(/after:/);
+    },
+  );
 
   it("marks no link active when active is undefined", () => {
     render(<AppNav />);
@@ -77,21 +76,19 @@ describe("TerminalWindow", () => {
     expect(screen.getByText("body content")).toBeInTheDocument();
   });
 
-  it.each([
-    "red",
-    "yellow",
-    "green",
-    "ink",
-  ] as const)("renders a %s status dot with a label", (statusDot) => {
-    const { container } = render(
-      <TerminalWindow title="t" statusDot={statusDot} statusLabel="live">
-        x
-      </TerminalWindow>,
-    );
-    expect(screen.getByText("live")).toBeInTheDocument();
-    // One of the three mac dots plus the status dot — at least 4 dots total.
-    expect(container.querySelectorAll("span.rounded-full").length).toBeGreaterThanOrEqual(4);
-  });
+  it.each(["red", "yellow", "green", "ink"] as const)(
+    "renders a %s status dot with a label",
+    (statusDot) => {
+      const { container } = render(
+        <TerminalWindow title="t" statusDot={statusDot} statusLabel="live">
+          x
+        </TerminalWindow>,
+      );
+      expect(screen.getByText("live")).toBeInTheDocument();
+      // One of the three mac dots plus the status dot — at least 4 dots total.
+      expect(container.querySelectorAll("span.rounded-full").length).toBeGreaterThanOrEqual(4);
+    },
+  );
 
   it("adds a pulse ring for the ink status", () => {
     const { container } = render(

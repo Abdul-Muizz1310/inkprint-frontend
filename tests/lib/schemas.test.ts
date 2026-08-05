@@ -188,13 +188,10 @@ describe("LeakScanResult", () => {
 });
 
 describe("DiffVerdict", () => {
-  it.each([
-    ["identical"],
-    ["near-duplicate"],
-    ["derivative"],
-    ["inspired"],
-    ["unrelated"],
-  ])("accepts %s", (v) => {
-    expect(() => DiffVerdict.parse(v)).not.toThrow();
-  });
+  it.each([["identical"], ["near-duplicate"], ["derivative"], ["inspired"], ["unrelated"]])(
+    "accepts %s",
+    (v) => {
+      expect(() => DiffVerdict.parse(v)).not.toThrow();
+    },
+  );
 });
