@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { EB_Garamond, Geist, Geist_Mono } from "next/font/google";
+import { SITE } from "@/lib/site/config";
+import { ROOT_VIEWPORT, rootMetadata } from "@/lib/site/metadata";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,11 +20,8 @@ const ebGaramond = EB_Garamond({
   weight: ["500", "600", "700"],
 });
 
-export const metadata: Metadata = {
-  title: "inkprint — content provenance",
-  description:
-    "Issue a cryptographically signed provenance certificate for any document. Prove who wrote it, what changed, and whether it leaked into AI training data.",
-};
+export const metadata: Metadata = rootMetadata(SITE);
+export const viewport: Viewport = ROOT_VIEWPORT;
 
 export default function RootLayout({
   children,

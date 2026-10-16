@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LeakTerminal } from "@/components/leak-terminal";
 import { PageFrame } from "@/components/terminal/PageFrame";
@@ -8,6 +9,13 @@ import { isUuid } from "@/lib/ids";
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+// A scan of a user's own text: previewable when shared, never in search results. The title
+// comes from the param alone, never from the scan.
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  return { title: `leak scan ${id.slice(0, 8)}`, robots: { index: false } };
+}
 
 export default async function LeakScanPage({ params }: PageProps) {
   const { id } = await params;

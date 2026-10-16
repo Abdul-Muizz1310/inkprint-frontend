@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CertificateCard } from "@/components/certificate-card";
@@ -11,6 +12,13 @@ import { isUuid } from "@/lib/ids";
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+// A user's own certificate: previewable when shared, never in search results. The title
+// comes from the param alone; fetching here would add a round-trip to a cold backend.
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  return { title: `certificate ${id.slice(0, 8)}`, robots: { index: false } };
+}
 
 export default async function CertificatePage({ params }: PageProps) {
   const { id } = await params;

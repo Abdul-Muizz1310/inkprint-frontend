@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { BackendStatus } from "@/components/backend-status";
 import { Editor } from "@/components/editor";
 import { LegalDisclaimer } from "@/components/legal-disclaimer";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function HomePage() {
   return (
