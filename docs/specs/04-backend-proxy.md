@@ -70,8 +70,11 @@ resolved URL must be on the backend's origin.
 
 - Headers copied when present: `content-type`, `accept`, `last-event-id`, `x-request-id`. Never
   `cookie`, `authorization`, `origin`, `referer`, `host`, or the browser's own `x-platform-token`.
-- Added: `x-platform-token` (fresh), `x-forwarded-for` (incoming `x-forwarded-for`, else
-  `x-real-ip`, else omitted) so the backend's per-visitor rate limit sees the visitor.
+- Added: `x-platform-token` (fresh), and `x-forwarded-for` set to **exactly one** address — the
+  leftmost entry of the incoming `x-forwarded-for` (Vercel sets it to the client it saw), else
+  `x-real-ip`, else omitted. The backend keys a frontend token's rate-limit bucket on
+  `inkprint-frontend:{that address}` (contract v2 §2, as amended 2026-10-20), so every visitor gets
+  their own bucket.
 - Body: `POST` bodies are read as bytes and forwarded unchanged, capped at `2 × MAX_TEXT_BYTES`
   (a declared or actual larger body ⇒ **413** `{"error":"payload too large"}`, no upstream call).
 - `fetch` options: `cache: "no-store"`, `redirect: "manual"`, `signal: request.signal`.
@@ -139,8 +142,9 @@ verifies each token with the public key and streams SSE with pauses. Browser-sid
 - **P5** the key loads from PKCS#8 DER base64, also wrapped in a BOM and a trailing CRLF.
 - **P6** every allowlisted method and path resolves onto the backend base (with or without a base
   path).
-- **P7** request headers: the four allowlisted copied, token set, `x-forwarded-for` from
-  `x-forwarded-for`, else `x-real-ip`, else absent.
+- **P7** request headers: the four allowlisted copied, token set, `x-forwarded-for` exactly one
+  address — the leftmost incoming `x-forwarded-for` entry (an empty one does not count), else
+  `x-real-ip`, else absent.
 - **P8** response headers: only the six allowlisted copied; an event stream gains
   `cache-control: no-cache, no-transform` and `x-accel-buffering: no`.
 - **P9** `GET` through the route reaches the backend with a token that verifies, the claims of §1,

@@ -117,6 +117,26 @@ describe("request headers", () => {
     });
   });
 
+  it.each([
+    ["203.0.113.7, 10.0.0.1", "203.0.113.7"],
+    ["  203.0.113.7 ,10.0.0.1, 10.0.0.2", "203.0.113.7"],
+    ["2001:db8::1, 10.0.0.1", "2001:db8::1"],
+  ])("P7 forwards exactly one address — the leftmost of %j", (incoming, expected) => {
+    expect(
+      upstreamRequestHeaders(new Headers({ "x-forwarded-for": incoming }), "t").get(
+        "x-forwarded-for",
+      ),
+    ).toBe(expected);
+  });
+
+  it.each([",10.0.0.1", " , "])(
+    "P7 an empty leftmost entry (%j) falls back to x-real-ip",
+    (incoming) => {
+      const headers = new Headers({ "x-forwarded-for": incoming, "x-real-ip": "198.51.100.1" });
+      expect(upstreamRequestHeaders(headers, "t").get("x-forwarded-for")).toBe("198.51.100.1");
+    },
+  );
+
   it("P7 falls back to x-real-ip, else omits x-forwarded-for", () => {
     expect(
       upstreamRequestHeaders(new Headers({ "x-real-ip": "198.51.100.1" }), "t").get(

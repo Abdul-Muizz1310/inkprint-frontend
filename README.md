@@ -12,7 +12,7 @@
 ![zod](https://img.shields.io/badge/Zod-boundaries-3068b7?style=flat-square)
 ![rc](https://img.shields.io/badge/react--compiler-enabled-ff69b4?style=flat-square)
 ![vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=flat-square&logo=vercel&logoColor=white)
-![tests](https://img.shields.io/badge/tests-408%20unit-6e9f18?style=flat-square)
+![tests](https://img.shields.io/badge/tests-413%20unit-6e9f18?style=flat-square)
 ![biome](https://img.shields.io/badge/lint-Biome-60a5fa?style=flat-square)
 ![license](https://img.shields.io/badge/license-BUSL--1.1-lightgrey?style=flat-square)
 
@@ -209,7 +209,7 @@ src/
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
 | **QR** | qrcode.react — client-rendered SVG encoding the `/verify?id=` link (single source of truth) |
-| **Testing** | Vitest + Testing Library (408 unit tests incl. route-layer and the signing proxy, 95.76% line coverage over all src) · Playwright (e2e, live backend) |
+| **Testing** | Vitest + Testing Library (413 unit tests incl. route-layer and the signing proxy, 95.76% line coverage over all src) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -269,7 +269,7 @@ pnpm test:e2e                # Playwright chromium (live backend)
 
 | Metric | Value |
 |---|---|
-| **Unit tests** | 408 tests across app routes + components + lib (Vitest + jsdom; the proxy in Node, including one suite over real sockets with a local token-verifying backend) |
+| **Unit tests** | 413 tests across app routes + components + lib (Vitest + jsdom; the proxy in Node, including one suite over real sockets with a local token-verifying backend) |
 | **Line coverage** | **95.76%** (over all `src/`); 100% floors on `src/lib/server/**` and `src/app/api/**` |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |

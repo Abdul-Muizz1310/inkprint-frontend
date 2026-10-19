@@ -88,12 +88,17 @@ export function resolveUpstream(
     : UNKNOWN;
 }
 
+/**
+ * The visitor's one address (contract v2 §2: the backend keys a frontend
+ * token's rate-limit bucket on it). The leftmost `x-forwarded-for` entry —
+ * Vercel sets that header to the client it saw — else `x-real-ip`. Never the
+ * whole chain: exactly one address goes upstream.
+ */
 function clientAddress(incoming: Headers): string | null {
-  for (const name of ["x-forwarded-for", "x-real-ip"]) {
-    const value = incoming.get(name)?.trim();
-    if (value) return value;
-  }
-  return null;
+  const leftmost = incoming.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (leftmost) return leftmost;
+  const real = incoming.get("x-real-ip")?.trim();
+  return real ? real : null;
 }
 
 /** Headers for the upstream request: the allowlist, the fresh token, the visitor's address. */

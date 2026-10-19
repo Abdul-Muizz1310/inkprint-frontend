@@ -89,7 +89,8 @@ type Handler = typeof route.GET;
 function request(path: string[], init: RequestInit = {}): Request {
   return new Request(`http://localhost:3000/api/backend/${path.join("/")}`, {
     ...init,
-    headers: { "x-forwarded-for": "203.0.113.7", ...(init.headers ?? {}) },
+    // A chain, as a misconfigured hop might send: only the leftmost may go upstream.
+    headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1", ...(init.headers ?? {}) },
   });
 }
 
@@ -162,7 +163,7 @@ describe("proxy over real sockets", () => {
     expect(await res.text()).toBe(body);
   });
 
-  it("every request the backend saw was signed for inkprint, fresh, and carried the visitor", () => {
+  it("every request the backend saw was signed for inkprint, fresh, and carried exactly the visitor", () => {
     expect(seen.length).toBeGreaterThanOrEqual(3);
     const jtis = new Set<unknown>();
     for (const r of seen) {
