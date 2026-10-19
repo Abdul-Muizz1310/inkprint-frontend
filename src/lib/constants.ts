@@ -19,9 +19,7 @@ export const MAX_TEXT_BYTES = 1_048_576; // 1 MiB
 
 /**
  * Number of leading characters shown in the certificate page's digest preview.
- * Single source of truth: the api layer sizes its prefix fetch off this and the
- * page slices to it, so the preview length and the bytes pulled over the wire
- * can't drift apart. See `getCertificateDownloadPreview` (OPT-2).
+ * Single source of truth: the page slices the certificate's `text` to it.
  */
 export const PREVIEW_CHARS = 200;
 

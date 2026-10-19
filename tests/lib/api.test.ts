@@ -5,8 +5,6 @@ import {
   createLeakScan,
   diffText,
   getCertificate,
-  getCertificateDownload,
-  getCertificateDownloadPreview,
   getCertificateManifest,
   getLeakScan,
   isTimeoutError,
@@ -27,6 +25,7 @@ const validCertBody = {
   signature: "sig",
   manifest: {},
   storage_key: "certs/x",
+  text: "the certified words",
 };
 
 function mockFetch(body: unknown, init?: { status?: number; contentType?: string }) {
@@ -149,145 +148,22 @@ describe("api.ts", () => {
   });
 
   describe("getCertificate", () => {
-    it("parses a 200 response", async () => {
+    it("parses a 200 response, with the certificate's text", async () => {
       vi.stubGlobal("fetch", mockFetch(validCertBody));
       const result = await getCertificate(validCertBody.id);
       expect(result.author).toBe(validCertBody.author);
+      expect(result.text).toBe("the certified words");
+    });
+
+    it("throws when the backend sends no text (parse, don't cast)", async () => {
+      const { text: _text, ...withoutText } = validCertBody;
+      vi.stubGlobal("fetch", mockFetch(withoutText));
+      await expect(getCertificate(validCertBody.id)).rejects.toThrow();
     });
 
     it("throws on malformed body", async () => {
       vi.stubGlobal("fetch", mockFetch({ id: "not-a-uuid" }));
       await expect(getCertificate("x")).rejects.toThrow();
-    });
-  });
-
-  describe("getCertificateDownload", () => {
-    it("returns the raw text body", async () => {
-      vi.stubGlobal("fetch", mockFetch("plain text content", { contentType: "text/plain" }));
-      const result = await getCertificateDownload(validCertBody.id);
-      expect(result).toBe("plain text content");
-    });
-  });
-
-  // OPT-2: the certificate page needs only a ~200-char preview, but a body can
-  // be ~1 MiB. getCertificateDownloadPreview must pull only a prefix — via a
-  // Range request AND by cancelling the stream early — instead of the full body.
-  describe("getCertificateDownloadPreview (OPT-2)", () => {
-    // A fetch mock whose response body is a real ReadableStream, emitted in
-    // small chunks. `pulledBytes` records how much was actually enqueued so a
-    // test can prove the transfer stopped before the whole body was read.
-    function streamFetch(fullBody: string, opts?: { status?: number; chunkSize?: number }) {
-      const status = opts?.status ?? 200;
-      const chunkSize = opts?.chunkSize ?? 32;
-      const bytes = new TextEncoder().encode(fullBody);
-      const state = { pulledBytes: 0, cancelled: false };
-      const fetchMock = vi.fn(async (_url?: string | URL, _init?: RequestInit) => {
-        let offset = 0;
-        const stream = new ReadableStream<Uint8Array>({
-          pull(controller) {
-            if (offset >= bytes.length) {
-              controller.close();
-              return;
-            }
-            const end = Math.min(offset + chunkSize, bytes.length);
-            controller.enqueue(bytes.slice(offset, end));
-            offset = end;
-            state.pulledBytes = offset;
-          },
-          cancel() {
-            state.cancelled = true;
-          },
-        });
-        return new Response(stream, {
-          status,
-          headers: { "content-type": "text/plain" },
-        });
-      });
-      return { fetchMock, state, totalBytes: bytes.length };
-    }
-
-    it("sends a Range header sized to the requested char budget", async () => {
-      const { fetchMock } = streamFetch("hello world");
-      vi.stubGlobal("fetch", fetchMock);
-      await getCertificateDownloadPreview(validCertBody.id, 200);
-      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
-      const headers = init.headers as Record<string, string>;
-      // 200 chars * 4 bytes + 64 slack = 864 → bytes=0-863
-      expect(headers.Range).toBe("bytes=0-863");
-    });
-
-    it("returns only the first maxChars characters of a large body", async () => {
-      const { fetchMock } = streamFetch("x".repeat(5000));
-      vi.stubGlobal("fetch", fetchMock);
-      const preview = await getCertificateDownloadPreview(validCertBody.id, 200);
-      expect(preview.length).toBe(200);
-      expect(preview).toBe("x".repeat(200));
-    });
-
-    it("cancels the stream once it has enough — never pulls the full body", async () => {
-      // 100 KiB body in 32-byte chunks; a 200-char preview must not drain it.
-      const { fetchMock, state, totalBytes } = streamFetch("a".repeat(100_000), {
-        chunkSize: 32,
-      });
-      vi.stubGlobal("fetch", fetchMock);
-      const preview = await getCertificateDownloadPreview(validCertBody.id, 200);
-      expect(preview.length).toBe(200);
-      expect(state.cancelled).toBe(true);
-      // The whole point of OPT-2: only a small prefix crosses the wire.
-      expect(state.pulledBytes).toBeLessThan(1_000);
-      expect(state.pulledBytes).toBeLessThan(totalBytes);
-    });
-
-    it("handles a body shorter than maxChars (returns it whole)", async () => {
-      const { fetchMock } = streamFetch("short");
-      vi.stubGlobal("fetch", fetchMock);
-      const preview = await getCertificateDownloadPreview(validCertBody.id, 200);
-      expect(preview).toBe("short");
-    });
-
-    it("slices by characters, not bytes, for multibyte text", async () => {
-      // "€" is 3 UTF-8 bytes; a byte-based slice would split a codepoint.
-      const { fetchMock } = streamFetch("€".repeat(1000));
-      vi.stubGlobal("fetch", fetchMock);
-      const preview = await getCertificateDownloadPreview(validCertBody.id, 200);
-      expect(preview.length).toBe(200);
-      expect(preview).toBe("€".repeat(200));
-    });
-
-    it("is uncacheable (cache: no-store) so early-cancel isn't defeated by the data cache", async () => {
-      const { fetchMock } = streamFetch("body");
-      vi.stubGlobal("fetch", fetchMock);
-      await getCertificateDownloadPreview(validCertBody.id, 200);
-      const init = fetchMock.mock.calls[0]?.[1] as RequestInit & { next?: unknown };
-      expect(init.cache).toBe("no-store");
-      // Must NOT combine no-store with next.revalidate (Next forbids it).
-      expect(init.next).toBeUndefined();
-    });
-
-    it("throws ApiError on 404 (routes through request()'s error mapping)", async () => {
-      vi.stubGlobal("fetch", mockFetch({ detail: "gone" }, { status: 404 }));
-      await expect(getCertificateDownloadPreview("missing", 200)).rejects.toBeInstanceOf(ApiError);
-    });
-
-    it("falls back to buffered text() when the response has no streamable body", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => ({
-          ok: true,
-          status: 200,
-          body: null,
-          text: async () => "y".repeat(5000),
-        })),
-      );
-      const preview = await getCertificateDownloadPreview(validCertBody.id, 200);
-      expect(preview.length).toBe(200);
-    });
-
-    it("defaults to PREVIEW_CHARS (200) when no maxChars is given", async () => {
-      const { fetchMock } = streamFetch("z".repeat(5000));
-      vi.stubGlobal("fetch", fetchMock);
-      const preview = await getCertificateDownloadPreview(validCertBody.id);
-      expect(preview.length).toBe(200);
     });
   });
 
@@ -441,16 +317,6 @@ describe("api.ts", () => {
       };
       expect(init.next).toEqual(IMMUTABLE.next);
       expect(init.next?.revalidate).toBe(3600);
-    });
-
-    it("getCertificateDownload requests with next.revalidate=3600", async () => {
-      const fetchMock = mockFetch("body", { contentType: "text/plain" });
-      vi.stubGlobal("fetch", fetchMock);
-      await getCertificateDownload(validCertBody.id);
-      const init = fetchMock.mock.calls[0]?.[1] as RequestInit & {
-        next?: { revalidate?: number };
-      };
-      expect(init.next).toEqual(IMMUTABLE.next);
     });
 
     it("getCertificateManifest requests with next.revalidate=3600", async () => {

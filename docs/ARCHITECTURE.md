@@ -45,7 +45,7 @@ src/
 ├── app/            # routes (RSC by default; "use client" only where needed)
 │   ├── page.tsx                       # / — landing + editor
 │   ├── certificates/[id]/
-│   │   ├── page.tsx                   # RSC — fetch cert; derive 200-char preview (from content_preview, else download)
+│   │   ├── page.tsx                   # RSC — fetch cert (with its text); slice the 200-char digest from it
 │   │   ├── not-found.tsx              # 404 surface
 │   │   └── error.tsx                  # 5xx surface with reset()
 │   ├── verify/page.tsx                # client — manifest paste + check
@@ -95,7 +95,7 @@ sequenceDiagram
   API->>BE: GET /certificates/{id}
   BE-->>API: JSON
   API->>API: Zod parse → typed
-  Note over RSC,BE: preview = cert.content_preview if present,<br/>else getCertificateDownloadPreview(id) — Range + streamed<br/>early-cancel pulls only a prefix, never the ~1 MiB body
+  Note over RSC,BE: digest = cert.text sliced to 200 chars<br/>(/download is a zip and is never read as text)
   API-->>RSC: parsed cert + 200-char preview
   RSC-->>U: styled CertificateCard
 ```
@@ -109,19 +109,16 @@ arrives fully-rendered during the router transition. The only interactive parts
 of the card — copy-hash, share, download-manifest — are isolated inside
 `CertificateCard` as a client island.
 
-Certificates are immutable once issued, so `getCertificate` /
-`getCertificateDownload` are fetched with `next: { revalidate: 3600 }`. A
+Certificates are immutable once issued, so `getCertificate` is fetched with
+`next: { revalidate: 3600 }`. A
 widely-shared or QR-linked certificate is therefore served as an ISR-cached
 page instead of re-waking the cold-start-prone free-tier backend on every view.
 
-The digest preview never pulls the full body (OPT-2). When the backend supplies
-`content_preview` the RSC uses it directly; otherwise `getCertificateDownloadPreview`
-requests a `Range: bytes=0-N` window and streams the response, cancelling the
-reader as soon as it has `PREVIEW_CHARS` characters — so even a backend that
-ignores `Range` and answers `200` with a ~1 MiB body has its transfer aborted
-mid-stream. That fetch is intentionally `no-store` (Next's data cache would
-buffer the whole response and defeat the early-cancel); the immutable *metadata*
-fetch still carries the ISR cache.
+The digest comes from the certificate's `text`, which `GET /certificates/{id}`
+returns exactly as submitted: one cached round-trip, no second fetch. It used to
+read a prefix of `/download`, but that route serves a zip archive
+(`manifest.json`, `public_key.pem`, `content.txt`), and read as text it rendered
+raw `PK…` bytes; `/compare` had the same bug when diffing against the parent.
 
 ## Why Zod at every API boundary
 

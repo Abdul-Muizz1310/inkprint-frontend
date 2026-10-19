@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CertificateCard } from "@/components/certificate-card";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, getCertificate, getCertificateDownloadPreview } from "@/lib/api";
+import { ApiError, getCertificate } from "@/lib/api";
 import { PREVIEW_CHARS } from "@/lib/constants";
 import { env } from "@/lib/env";
 import { isUuid } from "@/lib/ids";
@@ -37,27 +37,9 @@ export default async function CertificatePage({ params }: PageProps) {
     throw err;
   }
 
-  // The card shows only the first PREVIEW_CHARS of the body (OPT-2). Never pull
-  // the whole (up to ~1 MiB) document just to slice a short preview:
-  //   - if the backend supplies `content_preview`, use it and make zero extra
-  //     round-trips;
-  //   - otherwise fetch only the leading prefix (Range + streamed early-cancel),
-  //     which transfers kilobytes rather than the full body.
-  let previewSource: string;
-  if (typeof cert.content_preview === "string") {
-    previewSource = cert.content_preview;
-  } else {
-    try {
-      previewSource = await getCertificateDownloadPreview(id, PREVIEW_CHARS);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        notFound();
-      }
-      throw err;
-    }
-  }
-
-  const digestPreview = previewSource.slice(0, PREVIEW_CHARS);
+  // The digest shows the certificate's own words, which GET /certificates/{id}
+  // returns; /download is a zip archive and must never be read as text.
+  const digestPreview = cert.text.slice(0, PREVIEW_CHARS);
   const verifyUrl = `${env.NEXT_PUBLIC_SITE_URL}/verify?id=${cert.id}`;
   const shortId = cert.id.slice(0, 8);
 

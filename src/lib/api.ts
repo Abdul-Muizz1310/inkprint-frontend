@@ -1,6 +1,7 @@
-import { MAX_TEXT_BYTES, PREVIEW_CHARS, textByteLength } from "@/lib/constants";
+import { MAX_TEXT_BYTES, textByteLength } from "@/lib/constants";
 import { env } from "@/lib/env";
 import {
+  CertificateDetail,
   CertificateResponse,
   DiffResponse,
   LeakScanResponse,
@@ -110,72 +111,11 @@ export async function createCertificate(input: {
 // every view. (revalidate: 1h — cheap safety margin over "never changes".)
 const IMMUTABLE_CACHE: RequestInit = { next: { revalidate: 3600 } };
 
-export async function getCertificate(id: string): Promise<CertificateResponse> {
+/** The certificate with its stored text (the digest preview and the compare
+ * page's diff read it from here, never from the `/download` zip). */
+export async function getCertificate(id: string): Promise<CertificateDetail> {
   const response = await request(`/certificates/${seg(id)}`, IMMUTABLE_CACHE);
-  return CertificateResponse.parse(await response.json());
-}
-
-export async function getCertificateDownload(id: string): Promise<string> {
-  const response = await request(`/certificates/${seg(id)}/download`, IMMUTABLE_CACHE);
-  return response.text();
-}
-
-/**
- * Fetch only the leading `maxChars` characters of a certificate body (OPT-2).
- *
- * The certificate page renders a short digest preview, but a body can be up to
- * `MAX_TEXT_BYTES` (~1 MiB). Downloading the whole document to slice 200 chars
- * is pure waste. When the backend supplies `content_preview` the page never
- * calls this at all; when it doesn't, this still avoids the full transfer two
- * complementary ways, neither of which needs a backend change:
- *
- *   1. A `Range: bytes=0-N` request. If the backend honors ranges it returns
- *      just the prefix (HTTP 206) — kilobytes, not a megabyte.
- *   2. Streaming the response and cancelling the reader as soon as we have
- *      enough decoded characters. This bounds the bytes actually pulled over
- *      the wire even when the backend ignores `Range` and answers 200 with the
- *      full body — the transfer is aborted at the network layer mid-stream.
- *
- * Deliberately uncached (`no-store`): Next's data cache buffers the *entire*
- * response to persist it, which would defeat the early-cancel above, and a
- * `Range`/206 partial isn't a sound cache entry. The response is already tiny,
- * so there's nothing worth caching — the immutable cert *metadata* fetch
- * (`getCertificate`) still carries the ISR cache (OPT-1).
- */
-export async function getCertificateDownloadPreview(
-  id: string,
-  maxChars: number = PREVIEW_CHARS,
-): Promise<string> {
-  // UTF-8 encodes a char in at most 4 bytes; ask for enough window that a
-  // Range-honoring backend returns >= maxChars even for all-4-byte text, plus
-  // slack for a truncated trailing multibyte sequence.
-  const byteWindow = maxChars * 4 + 64;
-  const response = await request(`/certificates/${seg(id)}/download`, {
-    headers: { Range: `bytes=0-${byteWindow - 1}` },
-    cache: "no-store",
-  });
-
-  // Some runtimes/mocks expose no streamable body — fall back to buffering the
-  // (Range-bounded) text and slicing.
-  if (!response.body) {
-    return (await response.text()).slice(0, maxChars);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let text = "";
-  try {
-    while (text.length < maxChars) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) text += decoder.decode(value, { stream: true });
-    }
-  } finally {
-    // Stop pulling the moment we have enough — this is what caps the wire
-    // transfer when the backend ignored `Range` and streamed the whole body.
-    await reader.cancel().catch(() => {});
-  }
-  return text.slice(0, maxChars);
+  return CertificateDetail.parse(await response.json());
 }
 
 export async function getCertificateManifest(id: string): Promise<ManifestResponse> {

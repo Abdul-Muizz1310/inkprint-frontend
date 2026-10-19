@@ -24,15 +24,18 @@ export const CertificateResponse = z
     signature: z.string(),
     manifest: z.record(z.string(), z.unknown()),
     storage_key: z.string(),
-    // Optional server-rendered preview of the document's leading characters.
-    // When present, the certificate page renders the digest preview from this
-    // field instead of downloading the entire (up to ~1 MiB) document body.
-    // Absent on backends that don't yet expose it → callers fall back to the
-    // full download. Typed + parsed here so consumers never `as`-cast it.
-    content_preview: z.string().optional(),
   })
   .passthrough();
 export type CertificateResponse = z.infer<typeof CertificateResponse>;
+
+/**
+ * `GET /certificates/{id}`: the certificate plus its stored text, exactly as
+ * submitted. The only other public source of the text is `/download`, a zip —
+ * read as text it rendered as raw `PK…` bytes on the certificate and compare
+ * pages.
+ */
+export const CertificateDetail = CertificateResponse.extend({ text: z.string() });
+export type CertificateDetail = z.infer<typeof CertificateDetail>;
 
 export const VerifyResponse = z.object({
   valid: z.boolean(),

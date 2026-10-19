@@ -17,6 +17,7 @@ const { MockApiError } = vi.hoisted(() => {
 });
 
 const getCertificateMock = vi.fn();
+// Only the PK-bytes case wires this: the page must never call it.
 const getCertificateDownloadPreviewMock = vi.fn();
 const getCertificateManifestMock = vi.fn((_id: string) => Promise.resolve({}));
 
@@ -51,6 +52,7 @@ const cert = {
   signature: "sig",
   manifest: {},
   storage_key: "certs/x",
+  text: "the full document body ".repeat(50),
 };
 
 async function renderPage(id: string) {
@@ -87,61 +89,38 @@ describe("CertificatePage (RSC)", () => {
     expect(getCertificateDownloadPreviewMock).not.toHaveBeenCalled();
   });
 
+  it("passes only a 200-char digest of the certificate's text to the card", async () => {
+    getCertificateMock.mockResolvedValueOnce({ ...cert, text: "x".repeat(5000) });
+    await renderPage(VALID_ID);
+    const pre = document.querySelector("pre");
+    expect(pre?.textContent).toBe("x".repeat(PREVIEW_CHARS));
+  });
+
+  it("makes no second backend call for the digest", async () => {
+    getCertificateMock.mockResolvedValueOnce(cert);
+    await renderPage(VALID_ID);
+    expect(getCertificateMock).toHaveBeenCalledTimes(1);
+    expect(getCertificateDownloadPreviewMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the certificate's own words in the digest, never the /download zip's bytes", async () => {
+    // What the real backend answers on /download: a zip archive. Read as text
+    // it renders as "PK\u0003\u0004…" — the bug this case pins down.
+    getCertificateMock.mockResolvedValueOnce({ ...cert, text: "the original words" });
+    getCertificateDownloadPreviewMock.mockResolvedValueOnce(
+      "PK\u0003\u0004\u0014\u0000manifest.json",
+    );
+    await renderPage(VALID_ID);
+    const pre = document.querySelector("pre");
+    expect(pre?.textContent).toBe("the original words");
+    expect(pre?.textContent).not.toContain("PK");
+  });
+
   it("renders the certificate card on success", async () => {
     getCertificateMock.mockResolvedValueOnce(cert);
-    getCertificateDownloadPreviewMock.mockResolvedValueOnce("the full document body ".repeat(50));
     await renderPage(VALID_ID);
     expect(screen.getByRole("heading", { name: /certificate of authorship/i })).toBeInTheDocument();
     expect(screen.getByTestId("cert-author")).toHaveTextContent("alice@example.com");
-  });
-
-  it("passes only a 200-char digest preview to the card", async () => {
-    getCertificateMock.mockResolvedValueOnce(cert);
-    getCertificateDownloadPreviewMock.mockResolvedValueOnce("x".repeat(5000));
-    await renderPage(VALID_ID);
-    const pre = document.querySelector("pre");
-    expect(pre?.textContent?.length).toBe(200);
-  });
-
-  it("renders the preview from cert.content_preview and skips ANY download (OPT-2)", async () => {
-    getCertificateMock.mockResolvedValueOnce({
-      ...cert,
-      content_preview: "server-side preview prefix",
-    });
-    await renderPage(VALID_ID);
-    const pre = document.querySelector("pre");
-    expect(pre?.textContent).toBe("server-side preview prefix");
-    // The whole point: no body transfer at all for a 200-char preview.
-    expect(getCertificateDownloadPreviewMock).not.toHaveBeenCalled();
-  });
-
-  it("slices a long content_preview to 200 chars without downloading", async () => {
-    getCertificateMock.mockResolvedValueOnce({ ...cert, content_preview: "y".repeat(5000) });
-    await renderPage(VALID_ID);
-    const pre = document.querySelector("pre");
-    expect(pre?.textContent?.length).toBe(200);
-    expect(getCertificateDownloadPreviewMock).not.toHaveBeenCalled();
-  });
-
-  it("falls back to a bounded PREVIEW-only fetch when no content_preview is present (OPT-2)", async () => {
-    getCertificateMock.mockResolvedValueOnce(cert);
-    getCertificateDownloadPreviewMock.mockResolvedValueOnce("downloaded prefix");
-    await renderPage(VALID_ID);
-    const pre = document.querySelector("pre");
-    expect(pre?.textContent).toBe("downloaded prefix");
-    // Fallback must request only the preview prefix (never the full body), and
-    // must ask for exactly PREVIEW_CHARS so page + fetch can't drift.
-    expect(getCertificateDownloadPreviewMock).toHaveBeenCalledWith(VALID_ID, PREVIEW_CHARS);
-  });
-
-  it("notFound()s when the fallback preview fetch 404s", async () => {
-    getCertificateMock.mockResolvedValueOnce(cert);
-    getCertificateDownloadPreviewMock.mockRejectedValueOnce(
-      new MockApiError(404, { detail: "gone" }),
-    );
-    const err = await catchRender(VALID_ID);
-    expect((err as Error)?.message).toBe("NEXT_NOT_FOUND");
-    expect(notFoundMock).toHaveBeenCalled();
   });
 
   it("builds the verify footer as /verify?id=<cert.id>", async () => {

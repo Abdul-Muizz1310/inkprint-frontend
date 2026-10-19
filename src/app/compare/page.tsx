@@ -5,7 +5,7 @@ import { DiffView } from "@/components/diff-view";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, diffText, getCertificateDownload, isTimeoutError } from "@/lib/api";
+import { ApiError, diffText, getCertificate, isTimeoutError } from "@/lib/api";
 import { isUuid } from "@/lib/ids";
 import type { DiffResponse } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -32,11 +32,12 @@ export default function ComparePage() {
     setLoading(true);
     try {
       const trimmed = parentId.trim();
-      const [original, diff] = await Promise.all([
-        getCertificateDownload(trimmed),
+      // The parent's words come from GET /certificates/{id}; /download is a zip.
+      const [parent, diff] = await Promise.all([
+        getCertificate(trimmed),
         diffText({ parent_id: trimmed, text: newText }),
       ]);
-      setState({ original, current: newText, diff });
+      setState({ original: parent.text, current: newText, diff });
     } catch (err) {
       if (isTimeoutError(err)) {
         setError("backend timed out — it may be waking up, try again in a moment");

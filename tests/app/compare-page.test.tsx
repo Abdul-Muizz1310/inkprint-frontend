@@ -16,6 +16,7 @@ const { MockApiError } = vi.hoisted(() => {
 
 const diffTextMock = vi.fn();
 const getCertificateDownloadMock = vi.fn();
+const getCertificateMock = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: MockApiError,
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", () => ({
     e instanceof MockApiError && e.status === 0 && e.body === "timeout",
   diffText: (input: unknown) => diffTextMock(input),
   getCertificateDownload: (id: string) => getCertificateDownloadMock(id),
+  getCertificate: (id: string) => getCertificateMock(id),
 }));
 
 import ComparePage from "@/app/compare/page";
@@ -40,8 +42,32 @@ describe("ComparePage", () => {
   beforeEach(() => {
     diffTextMock.mockReset();
     getCertificateDownloadMock.mockReset();
+    getCertificateMock.mockReset();
   });
   afterEach(() => vi.clearAllMocks());
+
+  it("diffs against the parent certificate's text, never the /download zip's bytes", async () => {
+    getCertificateMock.mockResolvedValueOnce({ id: VALID_ID, text: "original body" });
+    getCertificateDownloadMock.mockResolvedValueOnce("PK\u0003\u0004\u0014\u0000manifest.json");
+    diffTextMock.mockResolvedValueOnce({
+      hamming: 4,
+      cosine: 0.9,
+      verdict: "near-duplicate",
+      overlap_pct: 88,
+      changed_spans: [],
+    });
+
+    render(<ComparePage />);
+    typeParent(VALID_ID);
+    typeText("new body");
+    fireEvent.click(screen.getByRole("button", { name: /compare/i }));
+
+    // The diff viewer splits lines into word spans, so read the rendered text whole.
+    await waitFor(() => expect(document.body.textContent).toContain("original"));
+    expect(document.body.textContent).not.toContain("PK\u0003\u0004");
+    expect(document.body.textContent).not.toContain("manifest.json");
+    expect(getCertificateMock).toHaveBeenCalledWith(VALID_ID);
+  });
 
   it("shows a uuid hint and keeps compare disabled for a malformed parent id", () => {
     render(<ComparePage />);
@@ -57,12 +83,12 @@ describe("ComparePage", () => {
     typeParent("xyz");
     typeText("text");
     fireEvent.click(screen.getByRole("button", { name: /compare/i }));
-    expect(getCertificateDownloadMock).not.toHaveBeenCalled();
+    expect(getCertificateMock).not.toHaveBeenCalled();
     expect(diffTextMock).not.toHaveBeenCalled();
   });
 
   it("fetches parent + diff and renders the verdict on success", async () => {
-    getCertificateDownloadMock.mockResolvedValueOnce("original body");
+    getCertificateMock.mockResolvedValueOnce({ id: VALID_ID, text: "original body" });
     diffTextMock.mockResolvedValueOnce({
       hamming: 4,
       cosine: 0.9,
@@ -77,13 +103,13 @@ describe("ComparePage", () => {
     fireEvent.click(screen.getByRole("button", { name: /compare/i }));
 
     await waitFor(() => {
-      expect(getCertificateDownloadMock).toHaveBeenCalledWith(VALID_ID);
+      expect(getCertificateMock).toHaveBeenCalledWith(VALID_ID);
       expect(diffTextMock).toHaveBeenCalledWith({ parent_id: VALID_ID, text: "new body" });
     });
   });
 
   it("shows 'parent certificate not found' on a 404", async () => {
-    getCertificateDownloadMock.mockRejectedValueOnce(new MockApiError(404, { detail: "x" }));
+    getCertificateMock.mockRejectedValueOnce(new MockApiError(404, { detail: "x" }));
     diffTextMock.mockRejectedValueOnce(new MockApiError(404, { detail: "x" }));
 
     render(<ComparePage />);
@@ -97,7 +123,7 @@ describe("ComparePage", () => {
   });
 
   it("shows a waking-up message on a timeout", async () => {
-    getCertificateDownloadMock.mockRejectedValueOnce(new MockApiError(0, "timeout"));
+    getCertificateMock.mockRejectedValueOnce(new MockApiError(0, "timeout"));
     diffTextMock.mockRejectedValueOnce(new MockApiError(0, "timeout"));
 
     render(<ComparePage />);

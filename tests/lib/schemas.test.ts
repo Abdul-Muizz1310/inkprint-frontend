@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CertificateDetail,
   CertificateResponse,
   DiffResponse,
   DiffVerdict,
@@ -22,6 +23,19 @@ const validCert = {
   storage_key: "certs/abc.txt",
 };
 
+describe("CertificateDetail", () => {
+  it("parses a certificate with its text", () => {
+    expect(CertificateDetail.parse({ ...validCert, text: "the words" }).text).toBe("the words");
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["not a string", 123],
+  ])("rejects text that is %s", (_label, text) => {
+    expect(() => CertificateDetail.parse({ ...validCert, text })).toThrow();
+  });
+});
+
 describe("CertificateResponse", () => {
   it("parses a valid certificate", () => {
     const parsed = CertificateResponse.parse(validCert);
@@ -43,20 +57,6 @@ describe("CertificateResponse", () => {
     expect(() =>
       CertificateResponse.parse({ ...validCert, extra_future_field: "x" }),
     ).not.toThrow();
-  });
-
-  it("parses an optional content_preview when present", () => {
-    const parsed = CertificateResponse.parse({ ...validCert, content_preview: "first chars" });
-    expect(parsed.content_preview).toBe("first chars");
-  });
-
-  it("leaves content_preview undefined when absent", () => {
-    const parsed = CertificateResponse.parse(validCert);
-    expect(parsed.content_preview).toBeUndefined();
-  });
-
-  it("rejects a non-string content_preview", () => {
-    expect(() => CertificateResponse.parse({ ...validCert, content_preview: 123 })).toThrow();
   });
 });
 
