@@ -47,6 +47,23 @@ describe("openLeakScanStream", () => {
     vi.unstubAllGlobals();
   });
 
+  it("P14 opens the stream through the same-origin proxy, never the backend's origin", () => {
+    openLeakScanStream("550e8400-e29b-41d4-a716-446655440000", {
+      onEvent: vi.fn(),
+      onError: vi.fn(),
+    });
+    expect(MockEventSource.instances[0]?.url).toBe(
+      "/api/backend/leak-scan/550e8400-e29b-41d4-a716-446655440000/stream",
+    );
+  });
+
+  it("P14 encodes the scan id as one path segment", () => {
+    openLeakScanStream("a/b?c", { onEvent: vi.fn(), onError: vi.fn() });
+    expect(MockEventSource.instances[0]?.url).toBe(
+      `/api/backend/leak-scan/${encodeURIComponent("a/b?c")}/stream`,
+    );
+  });
+
   it("dispatches parsed LeakEvents via onEvent", () => {
     const onEvent = vi.fn();
     const onError = vi.fn();

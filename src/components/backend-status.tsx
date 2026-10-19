@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { env } from "@/lib/env";
+import { proxyUrl } from "@/lib/backend-url";
 
 type Status =
   | { kind: "checking" }
@@ -27,7 +27,9 @@ export function BackendStatus() {
     }, COLD_THRESHOLD_MS);
 
     const controller = new AbortController();
-    fetch(`${env.NEXT_PUBLIC_API_URL}/health`, {
+    // Through the proxy, like every other call: a direct probe would report
+    // "OK" while a missing signing key made every real request fail.
+    fetch(proxyUrl("/health"), {
       signal: controller.signal,
       cache: "no-store",
     })

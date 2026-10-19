@@ -12,7 +12,7 @@
 ![zod](https://img.shields.io/badge/Zod-boundaries-3068b7?style=flat-square)
 ![rc](https://img.shields.io/badge/react--compiler-enabled-ff69b4?style=flat-square)
 ![vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=flat-square&logo=vercel&logoColor=white)
-![tests](https://img.shields.io/badge/tests-258%20unit-6e9f18?style=flat-square)
+![tests](https://img.shields.io/badge/tests-408%20unit-6e9f18?style=flat-square)
 ![biome](https://img.shields.io/badge/lint-Biome-60a5fa?style=flat-square)
 ![license](https://img.shields.io/badge/license-BUSL--1.1-lightgrey?style=flat-square)
 
@@ -39,7 +39,8 @@ $ pnpm dev
 
 - 🖼️ **The certificate page is a React Server Component.** `/certificates/[id]` fetches + parses on the server and hands a typed object to a pure presentational `CertificateCard`. No loading flicker on the one page where the visual has to land instantly.
 - 🛡️ **Zod at every boundary.** Every response from the backend — including the opaque C2PA manifest (`z.record`) and the polled leak-scan result (status-enum + passthrough) — is parsed through a Zod schema before it reaches React. No raw `as` casts at the network edge. Schema drift fails loud at the boundary — caught a real 64-bit simhash overflow bug during the first live E2E, not as a mysterious `undefined` later.
-- 🎯 **Live-backend E2E.** The Playwright happy path runs against the *real* production backend. No mocks. That's how CORS and schema drift get caught for free.
+- 🔏 **Signed, same-origin backend calls.** The browser never talks to the backend: it calls `/api/backend/…` on its own origin, and that server route checks the call against an allowlist, signs a fresh 60-second Ed25519 platform token with a server-only key, and streams the answer back — the leak-scan SSE event by event, the QR PNG and the certificate zip byte for byte. The certificate page's server render signs its own calls the same way.
+- 🎯 **Live-backend E2E.** The Playwright happy path runs against the *real* production backend, through the signing proxy. That's how schema drift gets caught for free.
 - 🧪 **Red-first Spec-TDD.** Every feature had a failing test before a line of implementation existed.
 
 ---
@@ -55,7 +56,8 @@ $ pnpm dev
 - 📱 QR code display linking to the certificate permalink
 - ⚛️ React 19 + React Compiler enabled
 - 🖥️ Terminal-style UI chrome (shadcn base-nova)
-- 💤 Backend health indicator with cold-start detection
+- 💤 Backend health indicator with cold-start detection (probed through the proxy, like every other call)
+- 🔏 Signing proxy `/api/backend/[...path]` (platform contract v2, DR-0030) — route allowlist, server-only key, unbuffered SSE
 
 ---
 
@@ -63,8 +65,10 @@ $ pnpm dev
 
 ```mermaid
 flowchart TD
-    Browser([Browser]) --> Vercel[Vercel Edge<br/>Next.js 16 RSC + client]
-    Vercel -->|typed fetch + Zod| Backend[inkprint-backend<br/>FastAPI on Render]
+    Browser([Browser]) -->|same origin| Proxy[/api/backend/...<br/>allowlist + signed token/]
+    Browser --> RSC[Next.js 16 RSC<br/>on Vercel]
+    Proxy -->|X-Platform-Token, streamed| Backend[inkprint-backend<br/>FastAPI on Render]
+    RSC -->|X-Platform-Token, typed fetch + Zod| Backend
     Backend --> DB[(Neon pgvector)]
     Backend --> R2[☁️ Cloudflare R2]
 ```
@@ -75,17 +79,20 @@ flowchart TD
 sequenceDiagram
     participant User as User
     participant Editor as Editor page (/)
+    participant Proxy as /api/backend (signs)
     participant API as inkprint-backend
     participant Router as Next.js router
     participant RSC as /certificates/[id] (RSC)
     participant Card as CertificateCard
 
     User->>Editor: paste text + author
-    Editor->>API: POST /certificates
-    API-->>Editor: { certificate_id, manifest }
+    Editor->>Proxy: POST /api/backend/certificates
+    Proxy->>API: POST /certificates + fresh token
+    API-->>Proxy: { certificate_id, manifest }
+    Proxy-->>Editor: streamed back
     Editor->>Router: router.push(/certificates/[id])
     Router->>RSC: server fetch certificate
-    RSC->>API: GET /certificates/{id}
+    RSC->>API: GET /certificates/{id} + its own token
     API-->>RSC: typed certificate payload
     RSC->>Card: render (no loading flicker)
     Card-->>User: signed certificate + QR code
@@ -99,26 +106,30 @@ sequenceDiagram
     participant Page as /leak/[id]
     participant Hook as useLeakStream
     participant ES as EventSource
+    participant Proxy as /api/backend (signs)
     participant API as inkprint-backend
 
     User->>Page: navigate to leak scan
     Page->>Hook: mount(scan_id)
-    Hook->>ES: new EventSource(/leak-scan/{id}/stream)
-    ES->>API: GET /leak-scan/{id}/stream
+    Hook->>ES: new EventSource(/api/backend/leak-scan/{id}/stream)
+    ES->>Proxy: GET /api/backend/leak-scan/{id}/stream
+    Proxy->>API: GET /leak-scan/{id}/stream + fresh token
     loop each source scanned
-        API-->>ES: event: progress { source, status, hits }
+        API-->>Proxy: event: progress { source, status, hits }
+        Proxy-->>ES: piped unbuffered
         ES-->>Hook: onMessage(progress)
         Hook->>Hook: Zod parse event
         Hook-->>Page: update terminal output
     end
-    API-->>ES: event: done { confidence, total_hits }
+    API-->>Proxy: event: done { confidence, total_hits }
+    Proxy-->>ES: piped unbuffered
     ES-->>Hook: close
     Hook-->>Page: phase = done, render final verdict
 ```
 
 **Zod at every boundary:**
 - 🌱 `env.ts` — validates `NEXT_PUBLIC_*` at import time
-- 🌐 `api.ts` — schema-parses every fetch response
+- 🌐 `api-client.ts` — schema-parses every fetch response (bound to the proxy in `api.ts`, to a signed direct transport in `server/backend-api.ts`)
 - 📡 `sse.ts` — validates every SSE event payload
 
 ---
@@ -138,8 +149,10 @@ src/
 │   │   └── page.tsx                  # Paste manifest, get itemised verdict
 │   ├── compare/
 │   │   └── page.tsx                  # Diff new text against parent certificate
-│   └── leak/[id]/
-│       └── page.tsx                  # SSE streaming leak-scan terminal
+│   ├── leak/[id]/
+│   │   └── page.tsx                  # SSE streaming leak-scan terminal
+│   └── api/backend/[...path]/
+│       └── route.ts                  # Signing proxy: allowlist → token → stream back
 ├── components/
 │   ├── certificate-card.tsx          # Styled certificate display (pure)
 │   ├── editor.tsx                    # Text input + author + fingerprint action
@@ -152,7 +165,15 @@ src/
 │   └── terminal/                     # Terminal window, nav, prompt, status bar
 └── lib/
     ├── env.ts                        # Runtime env validation (Zod)
-    ├── api.ts                        # typed fetch client — Zod-parsed, 30s timeout, ApiError
+    ├── api-client.ts                 # typed client over a Transport — Zod-parsed, 30s timeout, ApiError
+    ├── api.ts                        # browser binding: every call through /api/backend
+    ├── backend-url.ts                # the proxy prefix (the browser never knows the backend URL)
+    ├── server/                       # server-only (`import "server-only"`)
+    │   ├── token-claims.ts           # contract-v2 claims, base64url, key parsing (pure)
+    │   ├── platform-token.ts         # Ed25519 signing (node:crypto)
+    │   ├── proxy-rules.ts            # route allowlist + header rules (pure)
+    │   ├── backend-proxy.ts          # the proxy shell: refuse, sign, forward, stream
+    │   └── backend-api.ts            # signed direct client for the certificate RSC
     ├── sse.ts                        # SSE EventSource wrapper with Zod validation
     ├── schemas.ts                    # Zod schemas for all API contracts
     ├── ids.ts                        # shared UUID gate (isUuid) for every id-taking path
@@ -188,7 +209,7 @@ src/
 | **Validation** | Zod (env, API, SSE — every external boundary) |
 | **Diff** | react-diff-viewer-continued |
 | **QR** | qrcode.react — client-rendered SVG encoding the `/verify?id=` link (single source of truth) |
-| **Testing** | Vitest + Testing Library (258 unit tests incl. route-layer, 94.75% line coverage over all src) · Playwright (e2e, live backend) |
+| **Testing** | Vitest + Testing Library (408 unit tests incl. route-layer and the signing proxy, 95.76% line coverage over all src) · Playwright (e2e, live backend) |
 | **Lint / Format** | Biome (replaces ESLint + Prettier) |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 
@@ -215,10 +236,11 @@ pnpm dev
 
 | Var | Purpose |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | inkprint-backend base URL (REST + SSE) |
+| `NEXT_PUBLIC_API_URL` | inkprint-backend base URL — used by the server (proxy + RSC), never by browser code |
 | `NEXT_PUBLIC_SITE_URL` | Public canonical URL (OG tags, absolute links) |
+| `INKPRINT_FRONTEND_SIGNING_KEY_PRIVATE` | **Server-only.** Ed25519 private key (PKCS#8 DER, base64) that signs every backend call; the backend trusts its public half. Unset: the proxy answers `503` and the certificate page errors. |
 
-Validated at import time in [`src/lib/env.ts`](src/lib/env.ts) via Zod. Missing vars crash boot — **parse, don't validate**.
+The two public vars are validated at import time in [`src/lib/env.ts`](src/lib/env.ts) via Zod — missing vars crash boot, **parse, don't validate**. The signing key is read per request, so a missing key never crashes the server; CI fails the build if its name or the signing code reaches the client bundle.
 
 ### 📜 Scripts
 
@@ -247,13 +269,13 @@ pnpm test:e2e                # Playwright chromium (live backend)
 
 | Metric | Value |
 |---|---|
-| **Unit tests** | 258 tests across app routes + components + lib (Vitest + jsdom) |
-| **Line coverage** | **94.75%** (over all `src/`); the route layer (`certificates/[id]`, `verify`, `compare`, `leak/[id]`) is now unit-covered, not just by the deferred e2e |
+| **Unit tests** | 408 tests across app routes + components + lib (Vitest + jsdom; the proxy in Node, including one suite over real sockets with a local token-verifying backend) |
+| **Line coverage** | **95.76%** (over all `src/`); 100% floors on `src/lib/server/**` and `src/app/api/**` |
 | **E2E** | Playwright chromium against live production backend |
 | **Methodology** | Red-first Spec-TDD — every test written before implementation |
 | **Zod coverage** | Discriminated unions at env, API, SSE boundaries |
 
-CI (`.github/workflows/ci.yml`) runs lint → typecheck → vitest → next build on every push to `main` and every PR.
+CI (`.github/workflows/ci.yml`) runs lint → typecheck → vitest → next build (then fails if the signing code reached the client bundle) on every push to `main` and every PR.
 
 ---
 
@@ -278,6 +300,8 @@ Required env vars at build time:
 
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_SITE_URL`
+
+Required at runtime, server-only (never `NEXT_PUBLIC_`): `INKPRINT_FRONTEND_SIGNING_KEY_PRIVATE`.
 
 Next config: `reactCompiler: true`.
 

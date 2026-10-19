@@ -22,5 +22,6 @@ export const SITE = defineSite({
     highlight: "first",
   },
   // Certificates and leak scans are a user's own records: their pages set noindex instead.
-  routes: { sitemap: ["/", "/verify", "/compare"], disallow: [] },
+  // `/api/` is the signing proxy (spec 04): a machine endpoint.
+  routes: { sitemap: ["/", "/verify", "/compare"], disallow: ["/api/"] },
 });

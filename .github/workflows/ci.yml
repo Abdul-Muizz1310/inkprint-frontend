@@ -48,6 +48,13 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Spec 04 §4: the signing key's name and the minting code stay server-side.
+      - name: Client bundle carries no signing code
+        run: |
+          if grep -rlE "INKPRINT_FRONTEND_SIGNING_KEY_PRIVATE|createPrivateKey" .next/static; then
+            echo "::error::server-only signing code reached the client bundle"
+            exit 1
+          fi
 
   # NOTE: no deploy job — the Vercel/Render deploy auto-triggers on push. This
   # job verifies the backend that deploy depends on actually came up. It is

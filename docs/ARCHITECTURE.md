@@ -14,7 +14,9 @@ graph TD
   subgraph Vercel
     RSC["/certificates/[id]<br/>RSC server component"]
     Client["Editor / Verify / Compare / Leak<br/>client components"]
-    Lib["@/lib/api<br/>@/lib/schemas (Zod)<br/>@/lib/sse"]
+    Lib["@/lib/api-client<br/>@/lib/schemas (Zod)<br/>@/lib/sse"]
+    Proxy["/api/backend/[...path]<br/>allowlist + signed token"]
+    Signed["@/lib/server/backend-api<br/>signed direct client"]
   end
   subgraph Render
     API[FastAPI<br/>inkprint-backend]
@@ -26,10 +28,13 @@ graph TD
 
   Browser --> RSC
   Browser --> Client
-  RSC --> Lib
+  RSC --> Signed
+  Signed --> Lib
   Client --> Lib
-  Lib -->|fetch + Zod parse| API
-  Lib -.SSE.-> API
+  Lib -->|same-origin fetch + Zod parse| Proxy
+  Lib -.SSE.-> Proxy
+  Proxy -->|X-Platform-Token, streamed| API
+  Signed -->|X-Platform-Token| API
   API --> DB
   API --> R2
 ```
@@ -64,7 +69,10 @@ src/
 └── lib/            # shared, pure, no-React
     ├── env.ts                         # Zod-validated NEXT_PUBLIC_* (fails loud at import time)
     ├── schemas.ts                     # Zod mirrors of every backend response (incl. manifest + leak result) + LeakEvent union
-    ├── api.ts                         # typed fetch client; Zod-parses every response, 30s AbortSignal timeout, ApiError for every failure
+    ├── api-client.ts                  # typed client over a Transport; Zod-parses every response, 30s AbortSignal timeout, ApiError for every failure
+    ├── api.ts                         # browser binding: every call through the /api/backend signing proxy
+    ├── backend-url.ts                 # the proxy prefix
+    ├── server/                        # server-only: token claims, Ed25519 signing, proxy allowlist + shell, signed RSC client (spec 04)
     ├── ids.ts                         # shared UUID gate (isUuid) — the single validation choke-point for id-taking paths
     ├── sse.ts                         # typed EventSource wrapper for leak-scan stream
     ├── format.ts                      # pure formatters (truncateMiddle, formatIssuedAt, formatKeyId)
@@ -78,6 +86,7 @@ sequenceDiagram
   participant U as User
   participant E as Editor (client)
   participant API as @/lib/api
+  participant P as /api/backend (signs)
   participant BE as inkprint-backend
   participant R as Next.js router
   participant RSC as /certificates/[id] RSC
@@ -85,14 +94,16 @@ sequenceDiagram
   U->>E: paste text + author
   U->>E: click "Fingerprint"
   E->>API: createCertificate({text, author})
-  API->>BE: POST /certificates
-  BE-->>API: 201 CertificateResponse
+  API->>P: POST /api/backend/certificates
+  P->>BE: POST /certificates + fresh platform token
+  BE-->>P: 201 CertificateResponse
+  P-->>API: streamed back
   API->>API: Zod parse → typed
   API-->>E: typed CertificateResponse
   E->>R: router.push(`/certificates/${id}`)
   R->>RSC: navigate
-  RSC->>API: getCertificate(id)
-  API->>BE: GET /certificates/{id}
+  RSC->>API: getCertificate(id) via the signed server client
+  API->>BE: GET /certificates/{id} + its own platform token
   BE-->>API: JSON
   API->>API: Zod parse → typed
   Note over RSC,BE: digest = cert.text sliced to 200 chars<br/>(/download is a zip and is never read as text)
@@ -109,10 +120,12 @@ arrives fully-rendered during the router transition. The only interactive parts
 of the card — copy-hash, share, download-manifest — are isolated inside
 `CertificateCard` as a client island.
 
-Certificates are immutable once issued, so `getCertificate` is fetched with
-`next: { revalidate: 3600 }`. A
-widely-shared or QR-linked certificate is therefore served as an ISR-cached
-page instead of re-waking the cold-start-prone free-tier backend on every view.
+Certificates are immutable once issued, so the server client caches the parsed
+`getCertificate` result for an hour per id with `unstable_cache` (a fetch-level
+`next: { revalidate }` cannot work: every call carries a fresh platform token,
+and Next keys its fetch cache on request headers). A widely-shared or QR-linked
+certificate therefore does not re-wake the cold-start-prone free-tier backend on
+every view.
 
 The digest comes from the certificate's `text`, which `GET /certificates/{id}`
 returns exactly as submitted: one cached round-trip, no second fetch. It used to

@@ -12,7 +12,9 @@ import {
 } from "@/lib/api";
 import { MAX_TEXT_BYTES } from "@/lib/constants";
 
-const API = "https://inkprint-backend.onrender.com";
+// Browser calls go through the same-origin signing proxy (spec 04), never to
+// the backend's origin.
+const API = "/api/backend";
 
 const validCertBody = {
   id: "550e8400-e29b-41d4-a716-446655440000",
@@ -301,48 +303,50 @@ describe("api.ts", () => {
     });
   });
 
-  // OPT-1: certificates are immutable once issued, so their GETs must be
-  // marked cacheable (Next ISR) rather than re-waking the cold-start backend on
-  // every view. These tests guard the cache init so a regression that dropped
-  // it fails here instead of silently costing a round-trip per page load.
-  describe("immutable-resource caching (OPT-1)", () => {
-    const IMMUTABLE = { next: { revalidate: 3600 } };
-
-    it("getCertificate requests with next.revalidate=3600", async () => {
-      const fetchMock = mockFetch(validCertBody);
+  // OPT-1 moved server-side: a browser `fetch` ignores Next's `next` options,
+  // and the server client signs each call, so the certificate cache lives in
+  // `src/lib/server/backend-api.ts` (unstable_cache). The browser client must
+  // not pretend to cache.
+  describe("no Next cache options in the browser client", () => {
+    it.each([
+      ["getCertificate", () => getCertificate(validCertBody.id)],
+      ["getCertificateManifest", () => getCertificateManifest(validCertBody.id)],
+      ["getLeakScan", () => getLeakScan(validCertBody.id)],
+    ])("%s sends no `next` init", async (_name, run) => {
+      const fetchMock = mockFetch({ ...validCertBody, scan_id: validCertBody.id, status: "done" });
       vi.stubGlobal("fetch", fetchMock);
-      await getCertificate(validCertBody.id);
-      const init = fetchMock.mock.calls[0]?.[1] as RequestInit & {
-        next?: { revalidate?: number };
-      };
-      expect(init.next).toEqual(IMMUTABLE.next);
-      expect(init.next?.revalidate).toBe(3600);
-    });
-
-    it("getCertificateManifest requests with next.revalidate=3600", async () => {
-      const fetchMock = mockFetch({ foo: "bar" });
-      vi.stubGlobal("fetch", fetchMock);
-      await getCertificateManifest(validCertBody.id);
-      const init = fetchMock.mock.calls[0]?.[1] as RequestInit & {
-        next?: { revalidate?: number };
-      };
-      expect(init.next).toEqual(IMMUTABLE.next);
-    });
-
-    it("caches immutable GETs but NOT the mutable leak-scan poll", async () => {
-      // A leak scan's status changes over its lifetime — caching it would serve
-      // a stale 'pending' forever. Negative assertion: it must stay uncached.
-      const fetchMock = mockFetch({
-        scan_id: validCertBody.id,
-        status: "done",
-        hits: [],
-      });
-      vi.stubGlobal("fetch", fetchMock);
-      await getLeakScan(validCertBody.id);
-      const init = (fetchMock.mock.calls[0]?.[1] ?? {}) as RequestInit & {
-        next?: unknown;
-      };
+      await run().catch(() => {});
+      const init = (fetchMock.mock.calls[0]?.[1] ?? {}) as RequestInit & { next?: unknown };
       expect(init.next).toBeUndefined();
+    });
+  });
+
+  describe("every call goes through the proxy (P14)", () => {
+    it.each([
+      [
+        "createCertificate",
+        () => createCertificate({ text: "hi", author: "a@b.c" }),
+        "/certificates",
+      ],
+      [
+        "getCertificate",
+        () => getCertificate(validCertBody.id),
+        `/certificates/${validCertBody.id}`,
+      ],
+      [
+        "getCertificateManifest",
+        () => getCertificateManifest(validCertBody.id),
+        `/certificates/${validCertBody.id}/manifest`,
+      ],
+      ["verifyManifest", () => verifyManifest({ manifest: {} }), "/verify"],
+      ["diffText", () => diffText({ parent_id: validCertBody.id, text: "x" }), "/diff"],
+      ["createLeakScan", () => createLeakScan({ certificate_id: validCertBody.id }), "/leak-scan"],
+      ["getLeakScan", () => getLeakScan(validCertBody.id), `/leak-scan/${validCertBody.id}`],
+    ])("%s calls its route through /api/backend", async (_name, run, path) => {
+      const fetchMock = mockFetch({});
+      vi.stubGlobal("fetch", fetchMock);
+      await run().catch(() => {});
+      expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/backend${path}`);
     });
   });
 

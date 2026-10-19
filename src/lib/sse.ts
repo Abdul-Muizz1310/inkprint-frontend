@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { proxyUrl } from "@/lib/backend-url";
 import { type LeakEvent, LeakEvent as LeakEventSchema } from "@/lib/schemas";
 
 export type LeakStreamHandlers = {
@@ -8,11 +8,13 @@ export type LeakStreamHandlers = {
 };
 
 /**
- * Open an SSE connection to the leak-scan stream endpoint.
- * Returns a `close()` function the caller must invoke on unmount.
+ * Open an SSE connection to the leak-scan stream endpoint, through the
+ * same-origin signing proxy (spec 04 §3): an `EventSource` cannot send a
+ * header, so the proxy adds the platform token and pipes the stream back
+ * unbuffered. Returns a `close()` function the caller must invoke on unmount.
  */
 export function openLeakScanStream(scanId: string, handlers: LeakStreamHandlers): () => void {
-  const url = `${env.NEXT_PUBLIC_API_URL}/leak-scan/${encodeURIComponent(scanId)}/stream`;
+  const url = proxyUrl(`/leak-scan/${encodeURIComponent(scanId)}/stream`);
   const source = new EventSource(url);
 
   source.onopen = () => handlers.onOpen?.();

@@ -39,9 +39,9 @@ describe("manifest (T-FE-05)", () => {
 });
 
 describe("robots and sitemap (T-FE-06)", () => {
-  it("allows the whole site and names the sitemap", () => {
+  it("allows the site, disallows the signing proxy, and names the sitemap", () => {
     expect(robots()).toEqual({
-      rules: [{ userAgent: "*", allow: "/" }],
+      rules: [{ userAgent: "*", allow: "/", disallow: ["/api/"] }],
       sitemap: "https://inkprint-frontend.vercel.app/sitemap.xml",
     });
   });

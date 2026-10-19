@@ -31,6 +31,9 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_API_URL: "https://inkprint-backend.onrender.com",
       NEXT_PUBLIC_SITE_URL: baseURL,
+      // Browser calls go through the signing proxy (docs/specs/04-backend-proxy.md),
+      // which needs the frontend's key; without it every backend call answers 503.
+      INKPRINT_FRONTEND_SIGNING_KEY_PRIVATE: process.env.INKPRINT_FRONTEND_SIGNING_KEY_PRIVATE ?? "",
     },
   },
 });
