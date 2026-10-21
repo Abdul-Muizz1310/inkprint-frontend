@@ -79,8 +79,8 @@ rendered from it:
 
 - `manifest.webmanifest`: name, short name, description, `start_url` and `scope` `/`,
   `display: standalone`, dark background and theme colours, the three PNG icons.
-- `robots.txt`: allow `/`, disallow only machine endpoints (inkprint has none: the API lives on
-  the backend's own host), point at the sitemap.
+- `robots.txt`: allow `/`, disallow only machine endpoints (`/api/`, the signing proxy of spec 04),
+  point at the sitemap.
 - `sitemap.xml`: absolute URLs of `/`, `/verify` and `/compare`.
 
 ## The share card

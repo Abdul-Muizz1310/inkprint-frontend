@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import { CertificateCard } from "@/components/certificate-card";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
-import { ApiError, getCertificate } from "@/lib/api";
+import { ApiError } from "@/lib/api-client";
 import { PREVIEW_CHARS } from "@/lib/constants";
 import { env } from "@/lib/env";
 import { isUuid } from "@/lib/ids";
+import { getCertificate } from "@/lib/server/backend-api";
 
 type PageProps = {
   params: Promise<{ id: string }>;

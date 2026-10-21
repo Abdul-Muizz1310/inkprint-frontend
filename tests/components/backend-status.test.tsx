@@ -18,6 +18,17 @@ describe("BackendStatus", () => {
     expect(screen.getByText(/pinging backend/i)).toBeInTheDocument();
   });
 
+  it("P14 pings /health through the same-origin proxy, uncached", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200 }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<BackendStatus />);
+    expect(await screen.findByText("OK")).toBeInTheDocument();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/backend/health");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: "no-store" });
+  });
+
   it("shows backend OK with latency when /health responds", async () => {
     vi.stubGlobal(
       "fetch",

@@ -21,11 +21,17 @@ const getCertificateMock = vi.fn();
 const getCertificateDownloadPreviewMock = vi.fn();
 const getCertificateManifestMock = vi.fn((_id: string) => Promise.resolve({}));
 
-vi.mock("@/lib/api", () => ({
-  ApiError: MockApiError,
+// The RSC reads through the signed server client (spec 04 §3), never the
+// browser one; the card's client-side manifest download stays on `@/lib/api`.
+vi.mock("@/lib/server/backend-api", () => ({
   getCertificate: (id: string) => getCertificateMock(id),
+  // No longer exported: a witness that the page never reads the zip.
   getCertificateDownloadPreview: (id: string, maxChars?: number) =>
     getCertificateDownloadPreviewMock(id, maxChars),
+}));
+vi.mock("@/lib/api-client", () => ({ ApiError: MockApiError }));
+vi.mock("@/lib/api", () => ({
+  ApiError: MockApiError,
   getCertificateManifest: (id: string) => getCertificateManifestMock(id),
 }));
 
