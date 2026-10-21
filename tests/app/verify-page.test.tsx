@@ -46,6 +46,14 @@ describe("VerifyPage", () => {
   });
   afterEach(() => vi.clearAllMocks());
 
+  it("has one h1: the comment line that titles the page (spec 03)", () => {
+    render(<VerifyPage />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "verify a c2pa manifest" }),
+    ).toBeInTheDocument();
+  });
+
   // ---- COR-1: the /verify?id=<uuid> deep-link / QR target auto-loads ----
   it("auto-loads the manifest when a valid ?id= is present (deep-link)", async () => {
     searchParamsValue = new URLSearchParams(`id=${VALID_ID}`);

@@ -8,13 +8,21 @@ export type PromptProps = {
   children: ReactNode;
   className?: string;
   cursor?: boolean;
+  /** `h1` when the line is the page's title (spec 03): same look, and the page's one heading. */
+  as?: "div" | "h1";
 };
 
 /**
  * One line of a fake terminal. `$` for input, `>` for output,
  * `//` for comments.
  */
-export function Prompt({ kind = "input", children, className, cursor = false }: PromptProps) {
+export function Prompt({
+  kind = "input",
+  children,
+  className,
+  cursor = false,
+  as: Line = "div",
+}: PromptProps) {
   const marker = kind === "input" ? "$" : kind === "output" ? ">" : "//";
   const markerClass =
     kind === "input"
@@ -30,10 +38,12 @@ export function Prompt({ kind = "input", children, className, cursor = false }: 
         : "text-fg-muted";
 
   return (
-    <div className={cn("flex items-baseline gap-2.5 font-mono text-sm", className)}>
-      <span className={cn("select-none", markerClass)}>{marker}</span>
+    <Line className={cn("flex items-baseline gap-2.5 font-mono text-sm", className)}>
+      <span aria-hidden="true" className={cn("select-none", markerClass)}>
+        {marker}
+      </span>
       <span className={textClass}>{children}</span>
       {cursor && <span className="ml-0.5 inline-block h-3.5 w-1.5 bg-accent-ink cursor-blink" />}
-    </div>
+    </Line>
   );
 }

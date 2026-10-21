@@ -46,6 +46,14 @@ describe("ComparePage", () => {
   });
   afterEach(() => vi.clearAllMocks());
 
+  it("has one h1: the comment line that titles the page (spec 03)", () => {
+    render(<ComparePage />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "derivative-work detection" }),
+    ).toBeInTheDocument();
+  });
+
   it("diffs against the parent certificate's text, never the /download zip's bytes", async () => {
     getCertificateMock.mockResolvedValueOnce({ id: VALID_ID, text: "original body" });
     getCertificateDownloadMock.mockResolvedValueOnce("PK\u0003\u0004\u0014\u0000manifest.json");

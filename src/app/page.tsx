@@ -5,6 +5,8 @@ import { LegalDisclaimer } from "@/components/legal-disclaimer";
 import { PageFrame } from "@/components/terminal/PageFrame";
 import { Prompt } from "@/components/terminal/Prompt";
 import { TerminalWindow } from "@/components/terminal/TerminalWindow";
+import { SITE } from "@/lib/site/config";
+import { StructuredData } from "@/lib/site/structured-data";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -27,6 +29,7 @@ export default function HomePage() {
         </>
       }
     >
+      <StructuredData site={SITE} />
       <div className="flex flex-col gap-14 pt-6 md:pt-10">
         {/* Hero */}
         <section className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1.1fr_0.9fr]">

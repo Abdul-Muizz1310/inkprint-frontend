@@ -6,6 +6,7 @@ import CompareLayout, { metadata as compareMetadata } from "@/app/compare/layout
 import { generateMetadata as leakMetadata } from "@/app/leak/[id]/page";
 import { metadata as homeMetadata } from "@/app/page";
 import VerifyLayout, { metadata as verifyMetadata } from "@/app/verify/layout";
+import { SITE } from "@/lib/site/config";
 
 const VALID_ID = "550e8400-e29b-41d4-a716-446655440000";
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -22,9 +23,35 @@ describe("page titles (T-FE-09)", () => {
     expect(homeMetadata).toEqual({ alternates: { canonical: "/" } });
   });
 
-  it("titles /verify and /compare from the comment line that heads each page", () => {
-    expect(verifyMetadata).toEqual({ title: "verify a c2pa manifest" });
-    expect(compareMetadata).toEqual({ title: "derivative-work detection" });
+  it("titles /verify and /compare from the comment line that heads each page, describes them and names each as canonical", () => {
+    expect(verifyMetadata).toEqual({
+      title: "verify a c2pa manifest",
+      description:
+        "Paste a C2PA manifest or load one by certificate id, then check its Ed25519 signature, content hash and timestamp, with the original text if you have it.",
+      alternates: { canonical: "/verify" },
+    });
+    expect(compareMetadata).toEqual({
+      title: "derivative-work detection",
+      description:
+        "Diff a new text against a certified parent with SimHash and embedding cosine: identical, near-duplicate, derivative, inspired or unrelated.",
+      alternates: { canonical: "/compare" },
+    });
+  });
+
+  it("names every sitemap route as its own canonical, each with its own description", () => {
+    const indexable: Record<string, Metadata> = {
+      "/": homeMetadata,
+      "/verify": verifyMetadata,
+      "/compare": compareMetadata,
+    };
+    expect(Object.keys(indexable)).toEqual([...SITE.routes.sitemap]);
+    for (const [route, page] of Object.entries(indexable)) {
+      expect(page.alternates?.canonical, route).toBe(route);
+    }
+    const descriptions = Object.values(indexable).map(
+      (page) => page.description ?? SITE.description,
+    );
+    expect(new Set(descriptions).size).toBe(descriptions.length);
   });
 
   it("renders the client page inside each metadata layout", () => {
@@ -74,19 +101,17 @@ describe("page titles (T-FE-09)", () => {
     });
   });
 
-  it("sets no openGraph or twitter on any page, and a canonical only on the home page", async () => {
-    const pages: Metadata[] = [
-      verifyMetadata,
-      compareMetadata,
+  it("sets no openGraph or twitter on any page, and no canonical on a page kept out of search", async () => {
+    const hidden: Metadata[] = [
       await certificateMetadata(params(VALID_ID)),
       await leakMetadata(params(VALID_ID)),
     ];
-    for (const page of pages) {
+    for (const page of [homeMetadata, verifyMetadata, compareMetadata, ...hidden]) {
       expect(page).not.toHaveProperty("openGraph");
       expect(page).not.toHaveProperty("twitter");
+    }
+    for (const page of hidden) {
       expect(page).not.toHaveProperty("alternates");
     }
-    expect(homeMetadata).not.toHaveProperty("openGraph");
-    expect(homeMetadata).not.toHaveProperty("twitter");
   });
 });

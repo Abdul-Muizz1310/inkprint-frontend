@@ -46,24 +46,45 @@ The root layout exports `metadata` and `viewport` built from the config:
 ## Page titles
 
 Every page sets a short lowercase title; the template appends ` — inkprint`. No page sets
-`openGraph`, `twitter` or a canonical (a page-level `openGraph` would replace the root one and
-drop the share image), except the home page's canonical.
+`openGraph` or `twitter` (a page-level `openGraph` would replace the root one and drop the share
+image).
 
-| Route | Title | Indexed | Where it is set |
-|---|---|---|---|
-| `/` | the default title | yes | `page.tsx`: canonical `/` only |
-| `/verify` | `verify a c2pa manifest` | yes | `verify/layout.tsx` (the page is a client component) |
-| `/compare` | `derivative-work detection` | yes | `compare/layout.tsx` (the page is a client component) |
+Every indexable page other than `/` describes itself and names itself as canonical through
+`pageMetadata(site, route, { title, description })` (`src/lib/site/metadata.ts`, 2026-10-21). It
+returns the title, the description and the route as canonical, and throws a `SiteConfigError`
+when the module loads on an empty title, a title the template takes past 70 characters, or a
+description outside 50 to 160 characters, so bad copy fails the build. Next fills
+`og:description` and `twitter:description` from the description. No two indexable pages share a
+description.
+
+| Route | Title | Description | Indexed | Where it is set |
+|---|---|---|---|---|
+| `/` | the default title | the site's | yes | `page.tsx`: canonical `/` only |
+| `/verify` | `verify a c2pa manifest` | `Paste a C2PA manifest or load one by certificate id, then check its Ed25519 signature, content hash and timestamp, with the original text if you have it.` | yes, canonical `/verify` | `verify/layout.tsx` (the page is a client component) |
+| `/compare` | `derivative-work detection` | `Diff a new text against a certified parent with SimHash and embedding cosine: identical, near-duplicate, derivative, inspired or unrelated.` | yes, canonical `/compare` | `compare/layout.tsx` (the page is a client component) |
 | `/certificates/[id]` | `certificate <first 8 of id>` | no | `generateMetadata`, from the param only |
 | `/leak/[id]` | `leak scan <first 8 of id>` | no | `generateMetadata`, from the param only |
 
-`/verify` and `/compare` have no `<h1>`: their titles are the `//` comment line that heads each
-page. The two dynamic titles are built from the route param and never fetch: a certificate is
+`/verify` and `/compare` are titled by the `//` comment line that heads each page, and that line
+is the page's one `<h1>` (`<Prompt kind="comment" as="h1">`, 2026-10-21): it looks the same, and a
+search engine reads the title the tab shows. The two dynamic titles are built from the route param and never fetch: a certificate is
 already fetched by the page, and metadata must not add a second round-trip to a cold backend.
 
 `/certificates/[id]` and `/leak/[id]` show a user's own certificate and leak scan, so they set
 `robots: { index: false }`. They are **not** disallowed in robots.txt: link-preview bots such as
 Twitterbot obey robots.txt, and a shared certificate must still get its preview.
+
+## Structured data
+
+`/` renders one `<script type="application/ld+json">` (`src/lib/site/structured-data.tsx`,
+2026-10-21): a schema.org `@graph` of a `WebSite` (`<origin>/#website`: url, name, description,
+`inLanguage: "en"`, the author as publisher), a `WebApplication` (`<origin>/#app`: url, name,
+description, `applicationCategory: "DeveloperApplication"`, `operatingSystem: "Any"`,
+`isAccessibleForFree: true`, part of the website, by the author) and the author as a `Person`
+(`https://github.com/Abdul-Muizz1310#person`), all from the config. Search engines read the site
+name from the `WebSite` node, so a result says `inkprint`, not `vercel.app`. No rating, review or
+price is claimed. Every `<` in the JSON is escaped as `\u003c`, so no value can close the script
+tag.
 
 ## Icons
 
@@ -113,9 +134,11 @@ Unit tests live in `tests/lib/site/`; the E2E case in `tests/e2e/metadata.spec.t
   `apple-icon.png` is 180×180.
 - **T-FE-08** the headline layout: highlight segments, the greedy wrap, the size chosen at each
   boundary (96 px for the real headline), and the share card's alt text.
-- **T-FE-09** the page titles in the table above; the certificate and leak titles come from the
-  id without a fetch and are `noindex`; the verify and compare layouts render their page; no
-  page sets `openGraph` or `twitter`, and only the home page sets a canonical.
+- **T-FE-09** the page metadata in the table above; the certificate and leak titles come from
+  the id without a fetch and are `noindex` with no canonical; the verify and compare layouts
+  render their page, and each page's one `<h1>` is its comment line; no page sets `openGraph` or
+  `twitter`; every sitemap route names itself as
+  canonical, and no two of their descriptions are equal.
 - **T-FE-10** (E2E) the home page carries the title, description, `og:image`, the Twitter
   card, the theme colour, the icons and the manifest; `/verify`'s own title flows into
   `og:title`; a leak-scan page is `noindex` and the home page is not; every metadata route
@@ -125,6 +148,17 @@ Unit tests live in `tests/lib/site/`; the E2E case in `tests/e2e/metadata.spec.t
   accepts exactly those two origins, requires `/opengraph-image` to serve a PNG, and leaves
   `metadataBase` to T-FE-03. The certificate page fetches on the server, where `page.route`
   cannot reach, so its `noindex` is covered by T-FE-09.
+
+- **T-FE-11** `pageMetadata` returns the title, description and canonical; it accepts a title
+  the template takes to exactly 70 characters and descriptions of exactly 50 and 160; it rejects
+  an empty title, a title past 70 with the template, and a description under 50 or over 160,
+  naming the page and the reason.
+- **T-FE-12** the structured data: the graph above, derived from the config; its serialisation
+  escapes `<` and parses back to the same value; it renders as one `application/ld+json`
+  script.
+- **T-FE-13** (E2E) `/` carries exactly one structured-data script whose `WebSite` node names
+  the site on the production origin; `/verify` carries its own description in `description` and
+  `og:description`, and a canonical ending in `/verify`.
 
 ### Acceptance
 

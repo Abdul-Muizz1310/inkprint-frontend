@@ -53,6 +53,29 @@ test("an inner page's own title flows into og:title (T-FE-10)", async ({ page })
   await expect(page.locator('head meta[name="robots"]')).toHaveCount(0);
 });
 
+test("the home page carries the site's structured data (T-FE-13)", async ({ page }) => {
+  await stubBackend(page);
+  await page.goto("/");
+  const scripts = page.locator('script[type="application/ld+json"]');
+  await expect(scripts).toHaveCount(1);
+  const graph = JSON.parse((await scripts.textContent()) ?? "")["@graph"];
+  expect(graph.map((node: { "@type": string }) => node["@type"])).toEqual([
+    "WebSite",
+    "WebApplication",
+    "Person",
+  ]);
+  expect(graph[0]).toMatchObject({ url: `${SITE.url}/`, name: SITE.name });
+});
+
+test("an inner page describes itself and names itself as canonical (T-FE-13)", async ({ page }) => {
+  await stubBackend(page);
+  await page.goto("/verify");
+  const description = await content(page, 'meta[name="description"]');
+  expect(description).toMatch(/^Paste a C2PA manifest/);
+  expect(await content(page, 'meta[property="og:description"]')).toBe(description);
+  await expect(page.locator('head link[rel="canonical"]')).toHaveAttribute("href", /\/verify$/);
+});
+
 test("a leak-scan page has its own title and stays out of search (T-FE-10)", async ({ page }) => {
   await stubBackend(page);
   await page.goto(`/leak/${SCAN_ID}`);

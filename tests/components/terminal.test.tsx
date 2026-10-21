@@ -57,6 +57,21 @@ describe("Prompt", () => {
     expect(screen.getByText("$")).toBeInTheDocument();
   });
 
+  it("renders as an h1 when asked, named by its text alone: the marker is decoration", () => {
+    render(
+      <Prompt kind="comment" as="h1">
+        a page title
+      </Prompt>,
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "a page title" })).toBeInTheDocument();
+    expect(screen.getByText("//")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("is no heading by default", () => {
+    render(<Prompt kind="comment">a note</Prompt>);
+    expect(screen.queryByRole("heading")).toBeNull();
+  });
+
   it("renders a blinking cursor only when requested", () => {
     const { container, rerender } = render(<Prompt cursor>x</Prompt>);
     expect(container.querySelector(".cursor-blink")).not.toBeNull();

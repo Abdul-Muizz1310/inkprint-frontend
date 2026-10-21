@@ -67,7 +67,9 @@ export default function ComparePage() {
     >
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-col gap-1.5">
-          <Prompt kind="comment">derivative-work detection</Prompt>
+          <Prompt kind="comment" as="h1">
+            derivative-work detection
+          </Prompt>
           <Prompt kind="input">
             inkprint diff --parent {"<uuid>"} --text {"<file>"}
           </Prompt>

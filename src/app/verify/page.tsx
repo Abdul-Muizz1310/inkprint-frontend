@@ -114,7 +114,9 @@ function VerifyPageInner() {
     >
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-col gap-1.5">
-          <Prompt kind="comment">verify a c2pa manifest</Prompt>
+          <Prompt kind="comment" as="h1">
+            verify a c2pa manifest
+          </Prompt>
           <Prompt kind="input">inkprint verify ./manifest.json</Prompt>
         </div>
 
